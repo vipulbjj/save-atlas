@@ -21,8 +21,8 @@ export default function Home() {
         </div>
         <nav className="flex gap-8 items-center text-sm font-medium">
           <a href="#features" className="hover:text-white text-[var(--text-secondary)] transition-colors">Features</a>
-          <a href="#how-it-works" className="hover:text-white text-[var(--text-secondary)] transition-colors">How it Works</a>
-          <button className="btn-secondary">Log In</button>
+          <a href="/dashboard" className="hover:text-white text-[var(--text-secondary)] transition-colors">How it Works</a>
+          <a href="/dashboard" className="btn-secondary">Log In</a>
         </nav>
       </header>
 
@@ -39,13 +39,13 @@ export default function Home() {
               AI organizes your architecture and design inspiration into a searchable, intelligent knowledge library.
             </p>
             <div className={styles.heroActions}>
-              <button className="btn-primary">
+              <a href="/dashboard" className="btn-primary">
                 <UploadCloud size={18} />
                 Import Saves
-              </button>
-              <button className="btn-secondary">
+              </a>
+              <a href="/dashboard" className="btn-secondary">
                 View Demo
-              </button>
+              </a>
             </div>
           </div>
 
