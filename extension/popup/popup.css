@@ -1,0 +1,232 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 320px;
+  background: #121212;
+  color: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4a6b5d;
+  display: inline-block;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  color: #a3a3a3;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6b6b6b;
+  transition: background 0.3s;
+}
+
+.status-dot.idle    { background: #6b6b6b; }
+.status-dot.syncing { background: #b08d6a; animation: pulse 1s infinite alternate; }
+.status-dot.success { background: #4a6b5d; }
+.status-dot.error   { background: #8b3a3a; }
+
+@keyframes pulse {
+  0%   { opacity: 0.5; transform: scale(0.9); }
+  100% { opacity: 1;   transform: scale(1.1); }
+}
+
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-card {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #f5f5f5;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #6b6b6b;
+  margin-top: 2px;
+}
+
+/* Sync */
+.sync-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.sync-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f5f5f5;
+  color: #121212;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sync-btn:hover  { background: #e6dfd3; }
+.sync-btn:active { transform: scale(0.98); }
+.sync-btn:disabled {
+  background: #2a2a2a;
+  color: #6b6b6b;
+  cursor: not-allowed;
+}
+
+.sync-btn svg.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.sync-hint {
+  font-size: 0.75rem;
+  color: #6b6b6b;
+  text-align: center;
+}
+
+/* Message box */
+.message-box {
+  font-size: 0.8rem;
+  color: #a3a3a3;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 36px;
+  display: none;
+}
+
+.message-box.visible { display: block; }
+.message-box.error   { color: #c27b7b; border-color: rgba(200, 100, 100, 0.2); }
+.message-box.success { color: #7ba89a; border-color: rgba(74, 107, 93, 0.3); }
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-link {
+  display: block;
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.action-link.primary {
+  background: rgba(74, 107, 93, 0.15);
+  color: #7ba89a;
+  border: 1px solid rgba(74, 107, 93, 0.3);
+}
+
+.action-link.primary:hover {
+  background: rgba(74, 107, 93, 0.25);
+  color: #a3c7bc;
+}
+
+.action-link.secondary {
+  background: transparent;
+  color: #6b6b6b;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.action-link.secondary:hover {
+  color: #a3a3a3;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Auto badge */
+.auto-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #6b6b6b;
+  padding-bottom: 2px;
+}
+
+.auto-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4a6b5d;
+  animation: pulse 2s infinite alternate;
+}
