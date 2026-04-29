@@ -165,10 +165,10 @@ export default function Dashboard() {
           )}
         </div>
 
-        <button className={styles.uploadButton}>
+        <a href="/import" className={styles.uploadButton}>
           <Upload size={18} />
-          Upload Export
-        </button>
+          Import from Instagram
+        </a>
       </aside>
 
       {/* Main Content */}
