@@ -458,6 +458,7 @@ export default function Dashboard() {
                         src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=640&h=640&fit=cover`}
                         alt={save.caption || "Save"}
                         loading="lazy"
+                        referrerPolicy="no-referrer"
                         style={{ display: 'block' }}
                         onError={(e) => { 
                           // If proxy fails, try one direct fallback then hide
@@ -568,6 +569,7 @@ export default function Dashboard() {
                 src={selectedSave.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l&w=1080&h=1080&fit=cover`}
                 alt=""
                 className={styles.modalImg}
+                referrerPolicy="no-referrer"
                 onError={(e) => {
                   if (e.target.src.includes('weserv.nl')) {
                     e.target.src = `https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l`;
