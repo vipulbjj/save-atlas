@@ -103,9 +103,17 @@ export default function Dashboard() {
   const searchRef = useRef(null);
   const sortRef = useRef(null);
 
-  const [totalPhotos, setTotalPhotos] = useState(0);
-  const [totalVideos, setTotalVideos] = useState(0);
-  const [activeCollection, setActiveCollection] = useState("all");
+  const [globalStats, setGlobalStats] = useState({ total: 0, photos: 0, videos: 0, categories: {} });
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch("/api/stats");
+      const data = await res.json();
+      if (data.ok) setGlobalStats(data.stats);
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  };
 
   const fetchSaves = useCallback(async (query = "", cat = "all", coll = "all", reset = false) => {
     try {
@@ -118,7 +126,6 @@ export default function Dashboard() {
       
       if (query) params.set("search", query);
       if (cat !== "all") params.set("category", cat);
-      if (coll === "favourites") params.set("search", (query || "") + " #favourite"); // Conceptual for now
       
       const res = await fetch(`/api/saves?${params}`);
       const data = await res.json();
@@ -134,8 +141,6 @@ export default function Dashboard() {
           });
         }
         setTotalSaves(data.total || 0);
-        setTotalPhotos(data.photos || 0);
-        setTotalVideos(data.videos || 0);
         setHasMore(newSaves.length === 50);
         setLastRefresh(new Date());
       }
@@ -147,6 +152,7 @@ export default function Dashboard() {
   }, [page]);
 
   useEffect(() => { 
+    fetchStats();
     fetchSaves(searchQuery, activeCategory, activeCollection, true); 
     setPage(1);
   }, [searchQuery, activeCategory, activeCollection]);
@@ -175,13 +181,6 @@ export default function Dashboard() {
       const tb = new Date(b.timestamp || b.synced_at || 0).getTime();
       return sortOrder === "newest" ? tb - ta : ta - tb;
     });
-
-  // Category counts (we still show counts based on the visible set or total)
-  const categoryCounts = saves.reduce((acc, s) => {
-    const cat = s.ai_category || "other";
-    acc[cat] = (acc[cat] || 0) + 1;
-    return acc;
-  }, {});
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -231,10 +230,10 @@ export default function Dashboard() {
 
   // Stat tiles
   const stats = [
-    { label: "Total Saves", value: totalSaves || "—" },
-    { label: "Categories", value: hasRealData ? Object.keys(categoryCounts).length : "—" },
-    { label: "Photos", value: totalPhotos || "—" },
-    { label: "Videos", value: totalVideos || "—" },
+    { label: "Total Saves", value: globalStats.total || "—" },
+    { label: "Categories", value: hasRealData ? Object.keys(globalStats.categories).length : "—" },
+    { label: "Photos", value: globalStats.photos || "—" },
+    { label: "Videos", value: globalStats.videos || "—" },
   ];
 
   return (
@@ -259,11 +258,11 @@ export default function Dashboard() {
                 >
                   <span className={styles.navIcon}>{cat.icon}</span>
                   <span>{cat.label}</span>
-                  {cat.id !== "all" && categoryCounts[cat.id] > 0 && (
-                    <span className={styles.navBadge}>{categoryCounts[cat.id]}</span>
+                  {cat.id !== "all" && globalStats.categories[cat.id] > 0 && (
+                    <span className={styles.navBadge}>{globalStats.categories[cat.id]}</span>
                   )}
-                  {cat.id === "all" && totalSaves > 0 && (
-                    <span className={styles.navBadge}>{totalSaves}</span>
+                  {cat.id === "all" && globalStats.total > 0 && (
+                    <span className={styles.navBadge}>{globalStats.total}</span>
                   )}
                 </button>
               ))}
@@ -456,18 +455,17 @@ export default function Dashboard() {
                   >
                     <div className={styles.cardThumb}>
                       <img
-                        src={save.thumbnail_url || `https://www.instagram.com/p/${save.instagram_id}/media/?size=l`}
+                        src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=640&h=640&fit=cover`}
                         alt={save.caption || "Save"}
                         loading="lazy"
                         style={{ display: 'block' }}
                         onError={(e) => { 
-                          if (e.target.src.includes('media/?size=l')) {
-                            // If fallback also fails, show placeholder
+                          // If proxy fails, try one direct fallback then hide
+                          if (e.target.src.includes('weserv.nl')) {
+                            e.target.src = `https://www.instagram.com/p/${save.instagram_id}/media/?size=l`;
+                          } else {
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'flex';
-                          } else {
-                            // Try the direct media fallback
-                            e.target.src = `https://www.instagram.com/p/${save.instagram_id}/media/?size=l`;
                           }
                         }}
                       />
@@ -567,11 +565,11 @@ export default function Dashboard() {
 
             <div className={styles.modalLeft}>
               <img
-                src={selectedSave.thumbnail_url || `https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l`}
+                src={selectedSave.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l&w=1080&h=1080&fit=cover`}
                 alt=""
                 className={styles.modalImg}
                 onError={(e) => {
-                  if (!e.target.src.includes('media/?size=l')) {
+                  if (e.target.src.includes('weserv.nl')) {
                     e.target.src = `https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l`;
                   }
                 }}
