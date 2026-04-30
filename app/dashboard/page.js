@@ -103,10 +103,11 @@ export default function Dashboard() {
   const searchRef = useRef(null);
   const sortRef = useRef(null);
 
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [totalPhotos, setTotalPhotos] = useState(0);
+  const [totalVideos, setTotalVideos] = useState(0);
+  const [activeCollection, setActiveCollection] = useState("all");
 
-  const fetchSaves = useCallback(async (query = "", cat = "all", media = "all", reset = false) => {
+  const fetchSaves = useCallback(async (query = "", cat = "all", coll = "all", reset = false) => {
     try {
       setLoading(true);
       const currentPage = reset ? 1 : page;
@@ -117,7 +118,7 @@ export default function Dashboard() {
       
       if (query) params.set("search", query);
       if (cat !== "all") params.set("category", cat);
-      // Note: media filtering still client-side for now as API doesn't support it yet
+      if (coll === "favourites") params.set("search", (query || "") + " #favourite"); // Conceptual for now
       
       const res = await fetch(`/api/saves?${params}`);
       const data = await res.json();
@@ -133,6 +134,8 @@ export default function Dashboard() {
           });
         }
         setTotalSaves(data.total || 0);
+        setTotalPhotos(data.photos || 0);
+        setTotalVideos(data.videos || 0);
         setHasMore(newSaves.length === 50);
         setLastRefresh(new Date());
       }
@@ -144,9 +147,9 @@ export default function Dashboard() {
   }, [page]);
 
   useEffect(() => { 
-    fetchSaves(searchQuery, activeCategory, mediaFilter, true); 
+    fetchSaves(searchQuery, activeCategory, activeCollection, true); 
     setPage(1);
-  }, [searchQuery, activeCategory]);
+  }, [searchQuery, activeCategory, activeCollection]);
 
   const loadMore = () => {
     setPage(prev => prev + 1);
@@ -154,7 +157,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (page > 1) {
-      fetchSaves(searchQuery, activeCategory, mediaFilter, false);
+      fetchSaves(searchQuery, activeCategory, activeCollection, false);
     }
   }, [page]);
 
@@ -162,6 +165,9 @@ export default function Dashboard() {
   const filteredSaves = saves
     .filter((s) => {
       if (mediaFilter !== "all" && s.media_type !== mediaFilter) return false;
+      if (activeCollection === "favourites" && s.likes === 0) return false;
+      if (activeCollection === "inspiration" && !s.ai_category?.match(/home|tech/)) return false;
+      if (activeCollection === "highlights" && !s.caption?.match(/#highlight|excellent|best/i)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -204,6 +210,22 @@ export default function Dashboard() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  const toggleLike = async (e, save) => {
+    e.stopPropagation();
+    try {
+      const newLikes = (save.likes || 0) === 0 ? 1 : 0;
+      const res = await fetch(`/api/saves/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: save.id, likes: newLikes }),
+      });
+      if (res.ok) {
+        setSaves(prev => prev.map(s => s.id === save.id ? { ...s, likes: newLikes } : s));
+      }
+    } catch (err) {
+      console.error("Failed to toggle like:", err);
+    }
+  };
 
   const hasRealData = saves.length > 0;
 
@@ -211,8 +233,8 @@ export default function Dashboard() {
   const stats = [
     { label: "Total Saves", value: totalSaves || "—" },
     { label: "Categories", value: hasRealData ? Object.keys(categoryCounts).length : "—" },
-    { label: "Photos", value: hasRealData ? saves.filter(s => s.media_type === "IMAGE").length : "—" },
-    { label: "Videos", value: hasRealData ? saves.filter(s => s.media_type === "VIDEO").length : "—" },
+    { label: "Photos", value: totalPhotos || "—" },
+    { label: "Videos", value: totalVideos || "—" },
   ];
 
   return (
@@ -232,8 +254,8 @@ export default function Dashboard() {
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
-                  className={`${styles.navItem} ${activeCategory === cat.id ? styles.navActive : ""}`}
-                  onClick={() => setActiveCategory(cat.id)}
+                  className={`${styles.navItem} ${activeCategory === cat.id && activeCollection === 'all' ? styles.navActive : ""}`}
+                  onClick={() => { setActiveCategory(cat.id); setActiveCollection('all'); }}
                 >
                   <span className={styles.navIcon}>{cat.icon}</span>
                   <span>{cat.label}</span>
@@ -250,11 +272,15 @@ export default function Dashboard() {
             <div className={styles.navSection}>
               <span className={styles.navLabel}>Collections</span>
               {[
-                { icon: <Heart size={15} />, label: "Favourites" },
-                { icon: <Lightbulb size={15} />, label: "Inspiration" },
-                { icon: <Sparkles size={15} />, label: "AI Highlights" },
-              ].map((item, i) => (
-                <button key={i} className={styles.navItem}>
+                { id: "favourites", icon: <Heart size={15} />, label: "Favourites" },
+                { id: "inspiration", icon: <Lightbulb size={15} />, label: "Inspiration" },
+                { id: "highlights", icon: <Sparkles size={15} />, label: "AI Highlights" },
+              ].map((item) => (
+                <button 
+                  key={item.id} 
+                  className={`${styles.navItem} ${activeCollection === item.id ? styles.navActive : ""}`}
+                  onClick={() => { setActiveCollection(item.id); setActiveCategory('all'); }}
+                >
                   <span className={styles.navIcon}>{item.icon}</span>
                   <span>{item.label}</span>
                 </button>
@@ -432,7 +458,6 @@ export default function Dashboard() {
                       <img
                         src={save.thumbnail_url || `https://www.instagram.com/p/${save.instagram_id}/media/?size=l`}
                         alt={save.caption || "Save"}
-                        crossOrigin="anonymous"
                         loading="lazy"
                         style={{ display: 'block' }}
                         onError={(e) => { 
@@ -446,6 +471,12 @@ export default function Dashboard() {
                           }
                         }}
                       />
+                      <button 
+                          className={`${styles.cardAction} ${save.likes > 0 ? styles.activeHeart : ""}`}
+                          onClick={(e) => toggleLike(e, save)}
+                        >
+                          <Heart size={14} fill={save.likes > 0 ? "currentColor" : "none"} />
+                        </button>
                       <div 
                         className={styles.cardPlaceholder} 
                         style={{ 
@@ -538,7 +569,6 @@ export default function Dashboard() {
               <img
                 src={selectedSave.thumbnail_url || `https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l`}
                 alt=""
-                crossOrigin="anonymous"
                 className={styles.modalImg}
                 onError={(e) => {
                   if (!e.target.src.includes('media/?size=l')) {

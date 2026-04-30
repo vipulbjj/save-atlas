@@ -43,10 +43,25 @@ export async function GET(request) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
+    // Get counts for photos and videos
+    const { count: photoCount } = await supabase
+      .from('saves')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', DEFAULT_USER_ID)
+      .eq('media_type', 'IMAGE');
+    
+    const { count: videoCount } = await supabase
+      .from('saves')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', DEFAULT_USER_ID)
+      .eq('media_type', 'VIDEO');
+
     return NextResponse.json({
       ok:    true,
       saves: data,
       total: count,
+      photos: photoCount || 0,
+      videos: videoCount || 0,
       page,
       limit,
     });
