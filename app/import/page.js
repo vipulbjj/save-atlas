@@ -31,65 +31,168 @@ async function extractSavedPosts(file) {
   if (name.endsWith(".zip")) {
     const zip = await JSZip.loadAsync(file);
 
-    // Search all paths for saved_posts.json (Instagram changes the folder structure)
-    const candidates = [];
+    // Collect all JSON files for inspection
+    const jsonEntries = [];
     zip.forEach((path, entry) => {
-      if (!entry.dir && path.toLowerCase().includes("saved_posts.json")) {
-        candidates.push(entry);
+      if (!entry.dir && path.toLowerCase().endsWith(".json")) {
+        jsonEntries.push({ path, entry });
       }
     });
 
-    if (candidates.length === 0) {
-      throw new Error(
-        `Could not find saved_posts.json inside the ZIP.\n\nMake sure you selected 'Saved posts' in JSON format when requesting your data.`
-      );
+    if (jsonEntries.length === 0) {
+      throw new Error("No JSON files found inside the ZIP. Make sure you downloaded the Instagram data export.");
     }
 
-    const jsonText = await candidates[0].async("string");
-    return JSON.parse(jsonText);
+    // Pass 1: prefer files named saved_posts*.json
+    const savedPostsFiles = jsonEntries.filter(({ path }) =>
+      path.toLowerCase().includes("saved_posts")
+    );
+
+    // Pass 2: if nothing named saved_posts, try all JSON files
+    const filesToTry = savedPostsFiles.length > 0 ? savedPostsFiles : jsonEntries;
+
+    const allSaves = [];
+    const seenShortcodes = new Set();
+
+    for (const { path, entry } of filesToTry) {
+      try {
+        const text = await entry.async("string");
+        const parsed = JSON.parse(text);
+        const saves = tryParseFormat(parsed, text);
+        for (const s of saves) {
+          if (!seenShortcodes.has(s.shortcode)) {
+            seenShortcodes.add(s.shortcode);
+            allSaves.push(s);
+          }
+        }
+      } catch { /* skip unparseable files */ }
+    }
+
+    if (allSaves.length > 0) return allSaves;
+
+    // Pass 3: brute-force regex across every JSON file in the ZIP
+    for (const { entry } of jsonEntries) {
+      try {
+        const text = await entry.async("string");
+        const saves = extractUrlsByRegex(text);
+        for (const s of saves) {
+          if (!seenShortcodes.has(s.shortcode)) {
+            seenShortcodes.add(s.shortcode);
+            allSaves.push(s);
+          }
+        }
+      } catch { /* skip */ }
+    }
+
+    if (allSaves.length > 0) return allSaves;
+
+    throw new Error(
+      "Could not find any saved Instagram posts in this ZIP.\n\nMake sure you requested 'Saved posts' data in JSON format from Instagram. Try re-requesting the export and selecting only 'Saved posts and collections'."
+    );
 
   } else if (name.endsWith(".json")) {
     const text = await file.text();
-    return JSON.parse(text);
+    try {
+      const parsed = JSON.parse(text);
+      const saves = tryParseFormat(parsed, text);
+      if (saves.length) return saves;
+    } catch { /* fallthrough */ }
+    const saves = extractUrlsByRegex(await file.text());
+    if (saves.length) return saves;
+    throw new Error("No Instagram saved post URLs found in this JSON file.");
   }
 
-  throw new Error("Please upload the .zip file from Instagram, or the saved_posts.json directly.");
+  throw new Error("Please upload the .zip file from Instagram, or a saved_posts.json file directly.");
 }
 
-// ── Parse Instagram's JSON format into clean saves ─────────────────────────
-function parseInstagramJson(raw) {
-  const items = raw?.saved_saved_media || raw?.saves || (Array.isArray(raw) ? raw : []);
-
-  if (!items.length) {
-    throw new Error(
-      "No saved posts found in the file.\n\nMake sure this is saved_posts.json from an Instagram data export."
-    );
-  }
-
+// ── Try every known Instagram JSON export structure ────────────────────────
+function tryParseFormat(raw, rawText) {
   const saves = [];
-  for (const entry of items) {
-    const savedOn = entry?.string_map_data?.["Saved on"];
-    const href = savedOn?.href || entry?.href || null;
-    const ts = savedOn?.timestamp || entry?.timestamp || null;
-    if (!href || !href.includes("instagram.com/p/")) continue;
+  const seen = new Set();
 
-    const match = href.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
-    const shortcode = match?.[1];
-    if (!shortcode) continue;
-
+  const add = (shortcode, timestamp, title) => {
+    if (!shortcode || seen.has(shortcode)) return;
+    seen.add(shortcode);
     saves.push({
       shortcode,
       permalink: `https://www.instagram.com/p/${shortcode}/`,
-      timestamp: ts ? new Date(ts * 1000).toISOString() : new Date().toISOString(),
-      title: entry?.title || null,
+      timestamp: timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(),
+      title: title || null,
     });
-  }
+  };
 
-  if (!saves.length) {
-    throw new Error("Couldn't extract any Instagram URLs. Is this the correct file?");
+  // Format A: { saved_saved_media: [{ string_map_data: { "Saved on": { href, timestamp } } }] }
+  const itemsA = raw?.saved_saved_media || raw?.saves_media || [];
+  for (const entry of itemsA) {
+    const savedOn = entry?.string_map_data?.["Saved on"] || entry?.string_map_data?.["Saved On"];
+    const href = savedOn?.href || entry?.href || null;
+    const ts = savedOn?.timestamp || entry?.timestamp || null;
+    if (href) {
+      const m = href.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
+      if (m) add(m[1], ts, entry?.title);
+    }
+  }
+  if (saves.length) return saves;
+
+  // Format B: array of { href, timestamp } directly
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      const href = entry?.href || entry?.link || entry?.url || null;
+      const ts = entry?.timestamp || entry?.saved_at || null;
+      if (href) {
+        const m = href.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
+        if (m) add(m[1], ts, entry?.title || entry?.caption);
+      }
+      // Also check nested string_map_data
+      const keys = entry?.string_map_data ? Object.values(entry.string_map_data) : [];
+      for (const v of keys) {
+        if (v?.href) {
+          const m = v.href.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
+          if (m) add(m[1], v.timestamp || ts, entry?.title);
+        }
+      }
+    }
+  }
+  if (saves.length) return saves;
+
+  // Format C: { media: [{ uri, creation_timestamp }] } (Facebook-style)
+  const mediaItems = raw?.media || raw?.items || [];
+  for (const item of mediaItems) {
+    if (item?.uri) {
+      const m = item.uri.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
+      if (m) add(m[1], item.creation_timestamp || item.timestamp, item?.title);
+    }
   }
 
   return saves;
+}
+
+// ── Last resort: regex sweep across raw text ───────────────────────────────
+function extractUrlsByRegex(text) {
+  const urlPattern = /instagram\.com\/p\/([A-Za-z0-9_-]+)/g;
+  const tsPattern = /"timestamp"\s*:\s*(\d+)/g;
+
+  const shortcodes = [];
+  const timestamps = [];
+  let m;
+
+  while ((m = urlPattern.exec(text)) !== null) {
+    shortcodes.push(m[1]);
+  }
+  while ((m = tsPattern.exec(text)) !== null) {
+    timestamps.push(parseInt(m[1], 10));
+  }
+
+  // Deduplicate shortcodes preserving order
+  const seen = new Set();
+  return shortcodes
+    .filter((sc) => { if (seen.has(sc)) return false; seen.add(sc); return true; })
+    .map((shortcode, i) => ({
+      shortcode,
+      permalink: `https://www.instagram.com/p/${shortcode}/`,
+      timestamp: timestamps[i] ? new Date(timestamps[i] * 1000).toISOString() : new Date().toISOString(),
+      title: null,
+    }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,8 +238,7 @@ export default function ImportPage() {
       setStatusLabel(`Reading ${file.name}…`);
       setProgress(15);
 
-      const raw = await extractSavedPosts(file);
-      const saves = parseInstagramJson(raw);
+      const saves = await extractSavedPosts(file);
 
       setProgress(35);
       setStatusLabel(`Found ${saves.length} saved posts. Sending to your library…`);
