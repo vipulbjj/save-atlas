@@ -42,7 +42,7 @@ const formatDate = (ts) => {
 
 const Highlight = ({ text, query }) => {
   if (!query) return <span>{text}</span>;
-  const parts = text.split(new RegExp(\`(\${query})\`, 'gi'));
+  const parts = text.split(new RegExp(`(${query})`, 'gi'));
   return (
     <span>
       {parts.map((part, i) => 
@@ -96,7 +96,7 @@ export default function Dashboard() {
       if (query) params.set("search", query);
       if (cat !== "all") params.set("category", cat);
       
-      const res = await fetch(\`/api/saves?\${params}\`);
+      const res = await fetch(`/api/saves?${params}`);
       const data = await res.json();
       
       if (data.ok) {
@@ -140,7 +140,7 @@ export default function Dashboard() {
     e.stopPropagation();
     try {
       const newLikes = (save.likes || 0) === 0 ? 1 : 0;
-      const res = await fetch(\`/api/saves/update\`, {
+      const res = await fetch(`/api/saves/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: save.id, likes: newLikes }),
@@ -194,7 +194,7 @@ export default function Dashboard() {
 
   const hasRealData = saves.length > 0;
 
-  const stats = [
+  const statsArr = [
     { label: "Total Saves", value: globalStats.total || "—" },
     { label: "Categories", value: hasRealData ? Object.keys(globalStats.categories).length : "—" },
     { label: "Photos", value: globalStats.photos || "—" },
@@ -216,7 +216,7 @@ export default function Dashboard() {
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
-                  className={\`\${styles.navItem} \${activeCategory === cat.id && activeCollection === 'all' ? styles.navActive : ""}\`}
+                  className={`${styles.navItem} ${activeCategory === cat.id && activeCollection === 'all' ? styles.navActive : ""}`}
                   onClick={() => { setActiveCategory(cat.id); setActiveCollection('all'); }}
                 >
                   <span className={styles.navIcon}>{cat.icon}</span>
@@ -240,7 +240,7 @@ export default function Dashboard() {
               ].map((item) => (
                 <button 
                   key={item.id} 
-                  className={\`\${styles.navItem} \${activeCollection === item.id ? styles.navActive : ""}\`}
+                  className={`${styles.navItem} ${activeCollection === item.id ? styles.navActive : ""}`}
                   onClick={() => { setActiveCollection(item.id); setActiveCategory('all'); }}
                 >
                   <span className={styles.navIcon}>{item.icon}</span>
@@ -288,7 +288,7 @@ export default function Dashboard() {
               </p>
             </div>
             <div className={styles.stats}>
-              {stats.map((s, i) => (
+              {statsArr.map((s, i) => (
                 <div key={i} className={styles.statCard}>
                   <span className={styles.statLabel}>{s.label}</span>
                   <span className={styles.statValue}>{s.value}</span>
@@ -302,7 +302,7 @@ export default function Dashboard() {
               {["all", "IMAGE", "VIDEO"].map((type) => (
                 <button 
                   key={type}
-                  className={\`\${styles.tab} \${mediaFilter === type ? styles.tabActive : ""}\`}
+                  className={`${styles.tab} ${mediaFilter === type ? styles.tabActive : ""}`}
                   onClick={() => setMediaFilter(type)}
                 >
                   {type === "all" && "All"}
@@ -315,13 +315,13 @@ export default function Dashboard() {
             <div className={styles.viewActions}>
               <div className={styles.viewToggle}>
                 <button 
-                  className={\`\${styles.viewBtn} \${viewMode === "grid" ? styles.viewBtnActive : ""}\`}
+                  className={`${styles.viewBtn} ${viewMode === "grid" ? styles.viewBtnActive : ""}`}
                   onClick={() => setViewMode("grid")}
                 >
                   <GridIcon size={18} />
                 </button>
                 <button 
-                  className={\`\${styles.viewBtn} \${viewMode === "list" ? styles.viewBtnActive : ""}\`}
+                  className={`${styles.viewBtn} ${viewMode === "list" ? styles.viewBtnActive : ""}`}
                   onClick={() => setViewMode("list")}
                 >
                   <List size={18} />
@@ -338,13 +338,13 @@ export default function Dashboard() {
                   <div key={save.id || i} className={styles.card} onClick={() => setSelectedSave(save)}>
                     <div className={styles.cardThumb}>
                       <img
-                        src={save.thumbnail_url || \`https://images.weserv.nl/?url=https://www.instagram.com/p/\${save.instagram_id}/media/?size=l&w=640&h=640&fit=cover\`}
+                        src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=640&h=640&fit=cover`}
                         alt=""
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={(e) => { 
                           if (e.target.src.includes('weserv.nl')) {
-                            e.target.src = \`https://www.instagram.com/p/\${save.instagram_id}/media/?size=l\`;
+                            e.target.src = `https://www.instagram.com/p/${save.instagram_id}/media/?size=l`;
                           } else {
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'flex';
@@ -352,14 +352,11 @@ export default function Dashboard() {
                         }}
                       />
                       <button 
-                        className={\`\${styles.cardAction} \${save.likes > 0 ? styles.activeHeart : ""}\`}
+                        className={`${styles.cardAction} ${save.likes > 0 ? styles.activeHeart : ""}`}
                         onClick={(e) => toggleLike(e, save)}
                       >
                         <Heart size={14} fill={save.likes > 0 ? "currentColor" : "none"} />
                       </button>
-                      <div className={styles.cardPlaceholder} style={{ display: 'none', background: \`linear-gradient(135deg, \${cat.color}22, \${cat.color}44)\` }}>
-                        <div className={styles.placeholderIcon} style={{ color: cat.color }}>{cat.icon}</div>
-                      </div>
                     </div>
                     <div className={styles.cardBody}>
                       <div className={styles.cardMeta}>
@@ -380,7 +377,7 @@ export default function Dashboard() {
                 <div key={save.id || i} className={styles.listRow} onClick={() => setSelectedSave(save)}>
                   <div className={styles.listThumb}>
                     <img 
-                      src={save.thumbnail_url || \`https://images.weserv.nl/?url=https://www.instagram.com/p/\${save.instagram_id}/media/?size=l&w=200&h=200&fit=cover\`} 
+                      src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=200&h=200&fit=cover`} 
                       alt="" 
                       referrerPolicy="no-referrer"
                       loading="lazy" 
@@ -411,7 +408,7 @@ export default function Dashboard() {
             <button className={styles.modalClose} onClick={() => setSelectedSave(null)}><X size={18} /></button>
             <div className={styles.modalLeft}>
               <img
-                src={selectedSave.thumbnail_url || \`https://images.weserv.nl/?url=https://www.instagram.com/p/\${selectedSave.instagram_id}/media/?size=l&w=1080&h=1080&fit=cover\`}
+                src={selectedSave.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l&w=1080&h=1080&fit=cover`}
                 alt=""
                 referrerPolicy="no-referrer"
               />
