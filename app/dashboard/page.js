@@ -32,8 +32,19 @@ const SORT_OPTIONS = [
   { id: "oldest", label: "Oldest first" },
 ];
 
+function fixEncoding(str) {
+  if (!str) return str;
+  try {
+    // Instagram exports UTF-8 bytes as individual characters
+    const bytes = new Uint8Array(str.split("").map((c) => c.charCodeAt(0)));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (e) {
+    return str;
+  }
+}
+
 function inferCategory(save) {
-  const text = `${save.caption || ""} ${(save.hashtags || []).join(" ")}`.toLowerCase();
+  const text = fixEncoding(`${save.caption || ""} ${(save.hashtags || []).join(" ")}`).toLowerCase();
   
   if (text.match(/ai|claude|gpt|ai|code|python|repo|efficient|logic|tech/)) return "tech-ai";
   if (text.match(/startup|yc|founder|marketing|brand|budget|startup|founder|yc|paul graham/)) return "business";
@@ -76,16 +87,37 @@ export default function Dashboard() {
   const searchRef = useRef(null);
   const sortRef = useRef(null);
 
-  const fetchSaves = useCallback(async (query = "") => {
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+
+  const fetchSaves = useCallback(async (query = "", cat = "all", media = "all", reset = false) => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ limit: "100" });
+      const currentPage = reset ? 1 : page;
+      const params = new URLSearchParams({ 
+        limit: "50", 
+        page: currentPage.toString(),
+      });
+      
       if (query) params.set("search", query);
+      if (cat !== "all") params.set("category", cat);
+      // Note: media filtering still client-side for now as API doesn't support it yet
+      
       const res = await fetch(`/api/saves?${params}`);
       const data = await res.json();
+      
       if (data.ok) {
-        setSaves(data.saves || []);
+        const newSaves = data.saves || [];
+        if (reset) {
+          setSaves(newSaves);
+        } else {
+          setSaves(prev => {
+            const existingIds = new Set(prev.map(s => s.id));
+            return [...prev, ...newSaves.filter(s => !existingIds.has(s.id))];
+          });
+        }
         setTotalSaves(data.total || 0);
+        setHasMore(newSaves.length === 50);
         setLastRefresh(new Date());
       }
     } catch (err) {
@@ -93,17 +125,41 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
-  useEffect(() => { fetchSaves(); }, [fetchSaves]);
+  useEffect(() => { 
+    fetchSaves(searchQuery, activeCategory, mediaFilter, true); 
+    setPage(1);
+  }, [searchQuery, activeCategory]);
+
+  const loadMore = () => {
+    setPage(prev => prev + 1);
+  };
+
   useEffect(() => {
-    const interval = setInterval(() => fetchSaves(searchQuery), 30000);
-    return () => clearInterval(interval);
-  }, [fetchSaves, searchQuery]);
-  useEffect(() => {
-    const t = setTimeout(() => fetchSaves(searchQuery), 350);
-    return () => clearTimeout(t);
-  }, [searchQuery, fetchSaves]);
+    if (page > 1) {
+      fetchSaves(searchQuery, activeCategory, mediaFilter, false);
+    }
+  }, [page]);
+
+  // Sort and Media filter remain client-side for responsiveness
+  const filteredSaves = saves
+    .filter((s) => {
+      if (mediaFilter !== "all" && s.media_type !== mediaFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const ta = new Date(a.timestamp || a.synced_at || 0).getTime();
+      const tb = new Date(b.timestamp || b.synced_at || 0).getTime();
+      return sortOrder === "newest" ? tb - ta : ta - tb;
+    });
+
+  // Category counts (we still show counts based on the visible set or total)
+  const categoryCounts = saves.reduce((acc, s) => {
+    const cat = s.ai_category || "other";
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {});
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -118,8 +174,10 @@ export default function Dashboard() {
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "/" && document.activeElement !== searchRef.current) {
-        e.preventDefault();
-        searchRef.current?.focus();
+        if (document.activeElement.tagName !== "INPUT") {
+          e.preventDefault();
+          searchRef.current?.focus();
+        }
       }
       if (e.key === "Escape") {
         setSelectedSave(null);
@@ -130,25 +188,6 @@ export default function Dashboard() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  // Filter + sort pipeline
-  const filteredSaves = saves
-    .filter((s) => {
-      if (mediaFilter !== "all" && s.media_type !== mediaFilter) return false;
-      if (activeCategory !== "all" && inferCategory(s) !== activeCategory) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      const ta = new Date(a.timestamp || a.synced_at || 0).getTime();
-      const tb = new Date(b.timestamp || b.synced_at || 0).getTime();
-      return sortOrder === "newest" ? tb - ta : ta - tb;
-    });
-
-  // Category counts
-  const categoryCounts = saves.reduce((acc, s) => {
-    const cat = inferCategory(s);
-    acc[cat] = (acc[cat] || 0) + 1;
-    return acc;
-  }, {});
 
   const hasRealData = saves.length > 0;
 
@@ -374,22 +413,27 @@ export default function Dashboard() {
                     onClick={() => setSelectedSave(save)}
                   >
                     <div className={styles.cardThumb}>
-                      {save.thumbnail_url ? (
-                        <img
-                          src={save.thumbnail_url}
-                          alt={save.caption || "Save"}
-                          crossOrigin="anonymous"
-                          loading="lazy"
-                          onError={(e) => { 
+                      <img
+                        src={save.thumbnail_url || `https://www.instagram.com/p/${save.instagram_id}/media/?size=l`}
+                        alt={save.caption || "Save"}
+                        crossOrigin="anonymous"
+                        loading="lazy"
+                        style={{ display: 'block' }}
+                        onError={(e) => { 
+                          if (e.target.src.includes('media/?size=l')) {
+                            // If fallback also fails, show placeholder
                             e.target.style.display = 'none';
                             e.target.nextSibling.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
+                          } else {
+                            // Try the direct media fallback
+                            e.target.src = `https://www.instagram.com/p/${save.instagram_id}/media/?size=l`;
+                          }
+                        }}
+                      />
                       <div 
                         className={styles.cardPlaceholder} 
                         style={{ 
-                          display: save.thumbnail_url ? 'none' : 'flex',
+                          display: 'none',
                           background: `linear-gradient(135deg, ${cat.color}22, ${cat.color}44)` 
                         }}
                       >
@@ -409,7 +453,7 @@ export default function Dashboard() {
                         </span>
                         <span className={styles.cardCat}>{cat.label}</span>
                       </div>
-                      {save.caption && <p className={styles.cardCaption}>{save.caption.slice(0, 80)}{save.caption.length > 80 ? "…" : ""}</p>}
+                      {save.caption && <p className={styles.cardCaption}>{fixEncoding(save.caption).slice(0, 80)}{save.caption.length > 80 ? "…" : ""}</p>}
                       <div className={styles.cardFooter}>
                         <span className={styles.cardDate}>{formatDate(save.timestamp)}</span>
                         {save.permalink && (
@@ -437,7 +481,7 @@ export default function Dashboard() {
                   </div>
                   <div className={styles.listMeta}>
                     <span className={styles.listUser}>@{save.username || "unknown"}</span>
-                    <p className={styles.listCaption}>{save.caption?.slice(0, 120) || "No caption"}{save.caption?.length > 120 ? "…" : ""}</p>
+                    <p className={styles.listCaption}>{fixEncoding(save.caption)?.slice(0, 120) || "No caption"}{save.caption?.length > 120 ? "…" : ""}</p>
                   </div>
                   <span className={styles.listCat}>{CATEGORIES.find(c => c.id === inferCategory(save))?.label}</span>
                   <span className={styles.listDate}>{formatDate(save.timestamp)}</span>
@@ -448,6 +492,17 @@ export default function Dashboard() {
                   )}
                 </div>
               ))}
+            </div>
+          {/* Pagination */}
+          {hasMore && filteredSaves.length > 0 && (
+            <div className={styles.loadMoreWrap}>
+              <button 
+                className={styles.loadMoreBtn} 
+                onClick={loadMore} 
+                disabled={loading}
+              >
+                {loading ? <Loader2 size={18} className={styles.spinning} /> : "Load More"}
+              </button>
             </div>
           )}
         </div>
@@ -460,11 +515,17 @@ export default function Dashboard() {
             <button className={styles.modalClose} onClick={() => setSelectedSave(null)}><X size={18} /></button>
 
             <div className={styles.modalLeft}>
-              {selectedSave.thumbnail_url ? (
-                <img src={selectedSave.thumbnail_url} alt="" crossOrigin="anonymous" className={styles.modalImg} />
-              ) : (
-                <div className={styles.modalNoImg}><ImageIcon size={48} /></div>
-              )}
+              <img
+                src={selectedSave.thumbnail_url || `https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l`}
+                alt=""
+                crossOrigin="anonymous"
+                className={styles.modalImg}
+                onError={(e) => {
+                  if (!e.target.src.includes('media/?size=l')) {
+                    e.target.src = `https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l`;
+                  }
+                }}
+              />
             </div>
 
             <div className={styles.modalRight}>
@@ -478,7 +539,7 @@ export default function Dashboard() {
               </div>
 
               {selectedSave.caption && (
-                <p className={styles.modalCaption}>{selectedSave.caption}</p>
+                <p className={styles.modalCaption}>{fixEncoding(selectedSave.caption)}</p>
               )}
 
               {selectedSave.hashtags?.length > 0 && (

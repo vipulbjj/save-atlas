@@ -24,6 +24,26 @@ export async function OPTIONS() {
   });
 }
 
+function fixEncoding(str) {
+  if (!str) return str;
+  try {
+    const bytes = new Uint8Array(str.split('').map((c) => c.charCodeAt(0)));
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch (e) {
+    return str;
+  }
+}
+
+function inferCategory(caption, hashtags) {
+  const text = `${caption || ''} ${(hashtags || []).join(' ')}`.toLowerCase();
+  if (text.match(/ai|claude|gpt|ai|code|python|repo|efficient|logic|tech/)) return 'tech-ai';
+  if (text.match(/startup|yc|founder|marketing|brand|budget|startup|founder|yc|paul graham/)) return 'business';
+  if (text.match(/love|relationship|maa|life|secrets|perspective|child|family|mindset|growth/)) return 'lifestyle';
+  if (text.match(/travel|trip|road trip|vacation|staycation|stay|dividends|eiffel|visit/)) return 'travel';
+  if (text.match(/home|interior|living|bedroom|kitchen|sofa|furniture|decor|room|villa|facade|architect/)) return 'home-design';
+  return 'other';
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -34,24 +54,32 @@ export async function POST(request) {
     }
 
     // Build Supabase records — no oEmbed (avoids timeout)
-    const records = saves.map((save) => ({
-      user_id: DEFAULT_USER_ID,
-      instagram_id: save.shortcode,
-      username: null,
-      caption: save.caption || save.title || null,
-      media_type: save.permalink?.includes('/reel/') ? 'VIDEO' : 'IMAGE',
-      thumbnail_url: null,
-      video_url: null,
-      hashtags: extractHashtags(save.caption || save.title || ''),
-      likes: 0,
-      location: null,
-      permalink: save.permalink,
-      timestamp: toISO(save.timestamp),
-      ai_processed: false,
-    }));
+    const records = saves.map((save) => {
+      const rawCaption = save.caption || save.title || '';
+      const fixedCaption = fixEncoding(rawCaption);
+      const hashtags = extractHashtags(fixedCaption);
+      const category = inferCategory(fixedCaption, hashtags);
+
+      return {
+        user_id: DEFAULT_USER_ID,
+        instagram_id: save.shortcode,
+        username: null,
+        caption: fixedCaption || null,
+        media_type: save.permalink?.includes('/reel/') ? 'VIDEO' : 'IMAGE',
+        thumbnail_url: null,
+        video_url: null,
+        hashtags: hashtags,
+        likes: 0,
+        location: null,
+        permalink: save.permalink,
+        timestamp: toISO(save.timestamp),
+        ai_processed: true, // Mark as processed since we did the inference
+        ai_category: category,
+      };
+    });
 
     const supabase = getSupabase();
-
+    
     // Fetch already-stored instagram_ids to deduplicate without needing a unique constraint
     const shortcodes = records.map((r) => r.instagram_id);
     const { data: existing } = await supabase
@@ -113,3 +141,4 @@ function toISO(ts) {
   const d = new Date(ts);
   return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
+

@@ -105,6 +105,18 @@ async function extractSavedPosts(file) {
   throw new Error("Please upload the .zip file from Instagram, or a saved_posts.json file directly.");
 }
 
+// ── Fix Instagram's broken UTF-8 encoding in JSON exports ─────────────────
+function fixEncoding(str) {
+  if (!str) return str;
+  try {
+    // Instagram exports UTF-8 bytes as individual characters in a string
+    const bytes = new Uint8Array(str.split("").map((c) => c.charCodeAt(0)));
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (e) {
+    return str;
+  }
+}
+
 // ── Try every known Instagram JSON export structure ────────────────────────
 function tryParseFormat(raw, rawText) {
   const saves = [];
@@ -117,7 +129,7 @@ function tryParseFormat(raw, rawText) {
       shortcode,
       permalink: `https://www.instagram.com/p/${shortcode}/`,
       timestamp: timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(),
-      title: title || null,
+      title: fixEncoding(title) || null,
     });
   };
 
