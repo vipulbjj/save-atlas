@@ -192,6 +192,19 @@
   cursor: default;
 }
 
+.isProcessing {
+  border-style: solid;
+  border-color: var(--accent-bronze);
+  background: rgba(176, 141, 106, 0.04);
+  cursor: default;
+}
+
+.progressNote {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .fileInput {
   display: none;
 }
