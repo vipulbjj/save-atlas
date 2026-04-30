@@ -26,18 +26,23 @@ export async function GET() {
       .eq('user_id', DEFAULT_USER_ID)
       .eq('media_type', 'VIDEO');
 
-    // 3. Category Counts
-    // We fetch all categories for the user and count them
-    const { data: catData, error: catError } = await supabase
+    // 3. Category & Subcategory Counts
+    const { data: catData } = await supabase
       .from('saves')
-      .select('ai_category')
+      .select('ai_category, ai_subcategory')
       .eq('user_id', DEFAULT_USER_ID);
 
-    const categories = (catData || []).reduce((acc, item) => {
+    const categories = {};
+    const subCategories = {};
+
+    (catData || []).forEach((item) => {
       const cat = item.ai_category || 'other';
-      acc[cat] = (acc[cat] || 0) + 1;
-      return acc;
-    }, {});
+      categories[cat] = (categories[cat] || 0) + 1;
+      
+      const sub = item.ai_subcategory || 'other';
+      if (!subCategories[cat]) subCategories[cat] = {};
+      subCategories[cat][sub] = (subCategories[cat][sub] || 0) + 1;
+    });
 
     return NextResponse.json({
       ok: true,
@@ -45,7 +50,8 @@ export async function GET() {
         total: total || 0,
         photos: photos || 0,
         videos: videos || 0,
-        categories
+        categories,
+        subCategories
       }
     });
   } catch (err) {

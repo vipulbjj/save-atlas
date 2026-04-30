@@ -15,6 +15,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
     const search   = searchParams.get('search');
+    const subcategory = searchParams.get('subcategory');
     const page     = parseInt(searchParams.get('page') || '1', 10);
     const limit    = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const offset   = (page - 1) * limit;
@@ -28,8 +29,12 @@ export async function GET(request) {
       .order('timestamp', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (category) {
+    if (category && category !== 'all') {
       query = query.eq('ai_category', category);
+    }
+
+    if (subcategory && subcategory !== 'all') {
+      query = query.eq('ai_subcategory', subcategory);
     }
 
     if (search) {

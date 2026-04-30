@@ -54,12 +54,46 @@ const Highlight = ({ text, query }) => {
   );
 };
 
+const SUBCATEGORIES = {
+  "tech-ai": [
+    { id: "ai-tools", label: "AI Tools" },
+    { id: "coding", label: "Coding" },
+    { id: "productivity", label: "Productivity" },
+    { id: "future", label: "Future Tech" }
+  ],
+  "business": [
+    { id: "founders", label: "Founders" },
+    { id: "marketing", label: "Marketing" },
+    { id: "finance", label: "Finance" },
+    { id: "strategy", label: "Strategy" }
+  ],
+  "lifestyle": [
+    { id: "mindset", label: "Mindset" },
+    { id: "family", label: "Family" },
+    { id: "wellness", label: "Wellness" },
+    { id: "personal-finance", label: "Money" }
+  ],
+  "travel": [
+    { id: "destinations", label: "Places" },
+    { id: "stays", label: "Stays" },
+    { id: "tips", label: "Tips" },
+    { id: "nature", label: "Nature" }
+  ],
+  "home-design": [
+    { id: "architecture", label: "Architecture" },
+    { id: "interiors", label: "Interiors" },
+    { id: "decor", label: "Decor" },
+    { id: "lighting", label: "Lighting" }
+  ]
+};
+
 export default function Dashboard() {
   const [saves, setSaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [activeCollection, setActiveCollection] = useState("all");
+  const [activeSubCategory, setActiveSubCategory] = useState("all");
   const [mediaFilter, setMediaFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [viewMode, setViewMode] = useState("grid");
@@ -69,7 +103,7 @@ export default function Dashboard() {
   const [lastRefresh, setLastRefresh] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [globalStats, setGlobalStats] = useState({ total: 0, photos: 0, videos: 0, categories: {} });
+  const [globalStats, setGlobalStats] = useState({ total: 0, photos: 0, videos: 0, categories: {}, subCategories: {} });
 
   const searchRef = useRef(null);
   const sortRef = useRef(null);
@@ -84,7 +118,7 @@ export default function Dashboard() {
     }
   };
 
-  const fetchSaves = useCallback(async (query = "", cat = "all", coll = "all", reset = false) => {
+  const fetchSaves = useCallback(async (query = "", cat = "all", sub = "all", coll = "all", reset = false) => {
     try {
       setLoading(true);
       const currentPage = reset ? 1 : page;
@@ -95,6 +129,7 @@ export default function Dashboard() {
       
       if (query) params.set("search", query);
       if (cat !== "all") params.set("category", cat);
+      if (sub !== "all") params.set("subcategory", sub);
       
       const res = await fetch(`/api/saves?${params}`);
       const data = await res.json();
@@ -122,9 +157,9 @@ export default function Dashboard() {
 
   useEffect(() => { 
     fetchStats();
-    fetchSaves(searchQuery, activeCategory, activeCollection, true); 
+    fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, true); 
     setPage(1);
-  }, [searchQuery, activeCategory, activeCollection]);
+  }, [searchQuery, activeCategory, activeSubCategory, activeCollection]);
 
   const loadMore = () => {
     setPage(prev => prev + 1);
@@ -132,7 +167,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (page > 1) {
-      fetchSaves(searchQuery, activeCategory, activeCollection, false);
+      fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, false);
     }
   }, [page]);
 
@@ -217,7 +252,7 @@ export default function Dashboard() {
                 <button
                   key={cat.id}
                   className={`${styles.navItem} ${activeCategory === cat.id && activeCollection === 'all' ? styles.navActive : ""}`}
-                  onClick={() => { setActiveCategory(cat.id); setActiveCollection('all'); }}
+                  onClick={() => { setActiveCategory(cat.id); setActiveCollection('all'); setActiveSubCategory('all'); }}
                 >
                   <span className={styles.navIcon}>{cat.icon}</span>
                   <span>{cat.label}</span>
@@ -241,7 +276,7 @@ export default function Dashboard() {
                 <button 
                   key={item.id} 
                   className={`${styles.navItem} ${activeCollection === item.id ? styles.navActive : ""}`}
-                  onClick={() => { setActiveCollection(item.id); setActiveCategory('all'); }}
+                  onClick={() => { setActiveCollection(item.id); setActiveCategory('all'); setActiveSubCategory('all'); }}
                 >
                   <span className={styles.navIcon}>{item.icon}</span>
                   <span>{item.label}</span>
@@ -329,6 +364,29 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {activeCategory !== 'all' && SUBCATEGORIES[activeCategory] && (
+            <div className={styles.subToolbar}>
+              <button 
+                className={`${styles.subTab} ${activeSubCategory === 'all' ? styles.subTabActive : ""}`}
+                onClick={() => setActiveSubCategory('all')}
+              >
+                All {CATEGORIES.find(c => c.id === activeCategory)?.label}
+              </button>
+              {SUBCATEGORIES[activeCategory].map((sub) => (
+                <button 
+                  key={sub.id}
+                  className={`${styles.subTab} ${activeSubCategory === sub.id ? styles.subTabActive : ""}`}
+                  onClick={() => setActiveSubCategory(sub.id)}
+                >
+                  {sub.label}
+                  {globalStats.subCategories[activeCategory]?.[sub.id] > 0 && (
+                    <span className={styles.subBadge}>{globalStats.subCategories[activeCategory][sub.id]}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
 
           {viewMode === "grid" ? (
             <div className={styles.grid}>
