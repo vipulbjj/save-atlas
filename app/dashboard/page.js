@@ -560,7 +560,6 @@ export default function Dashboard() {
           )}
         </div>
       </main>
-    </div>
 
       {/* ── Detail Modal ── */}
       {selectedSave && (
