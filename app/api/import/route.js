@@ -52,23 +52,34 @@ export async function POST(request) {
 
     const supabase = getSupabase();
 
-    // Batch upsert in chunks of 500 to stay within Supabase limits
-    const CHUNK = 500;
-    let inserted = 0;
+    // Fetch already-stored instagram_ids to deduplicate without needing a unique constraint
+    const shortcodes = records.map((r) => r.instagram_id);
+    const { data: existing } = await supabase
+      .from('saves')
+      .select('instagram_id')
+      .in('instagram_id', shortcodes);
 
-    for (let i = 0; i < records.length; i += CHUNK) {
-      const chunk = records.slice(i, i + CHUNK);
+    const existingSet = new Set((existing || []).map((r) => r.instagram_id));
+    const newRecords = records.filter((r) => !existingSet.has(r.instagram_id));
+
+    let inserted = 0;
+    const CHUNK = 500;
+
+    for (let i = 0; i < newRecords.length; i += CHUNK) {
+      const chunk = newRecords.slice(i, i + CHUNK);
       const { data, error } = await supabase
         .from('saves')
-        .upsert(chunk, { onConflict: 'instagram_id', ignoreDuplicates: true })
+        .insert(chunk)
         .select('id');
 
       if (error) {
-        console.error('Supabase upsert error:', error);
+        console.error('Supabase insert error:', error);
         return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
       }
       inserted += data?.length || 0;
     }
+
+    const skipped = records.length - newRecords.length;
 
     return NextResponse.json({
       ok: true,
