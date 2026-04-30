@@ -452,19 +452,40 @@
   display: block;
 }
 
-.card:hover .cardThumb img { transform: scale(1.04); }
-
-.cardNoImg {
+.cardPlaceholder {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  padding: 24px;
+  text-align: center;
+  gap: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
-.cardBadgeVideo,
-.cardBadgeCarousel {
+.placeholderIcon {
+  opacity: 0.8;
+  transform: scale(1.5);
+}
+
+.placeholderText {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
+}
+
+.card:hover .cardThumb img { transform: scale(1.04); }
+
+.cardBadgeVideo {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -476,40 +497,46 @@
   padding: 4px 8px;
   border-radius: 6px;
   letter-spacing: 0.02em;
-}
-
-.cardBadgeVideo {
-  background: rgba(239, 68, 68, 0.85);
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   backdrop-filter: blur(4px);
-}
-
-.cardBadgeCarousel {
-  background: rgba(99, 102, 241, 0.85);
-  color: white;
-  backdrop-filter: blur(4px);
+  z-index: 10;
 }
 
 .cardBody {
-  padding: 14px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
+}
+
+.cardMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .cardUser {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent-bronze);
-  letter-spacing: 0.01em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.cardCat {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  opacity: 0.8;
 }
 
 .cardCaption {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
   line-height: 1.5;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -518,23 +545,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
-}
-
-.cardCat {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-muted);
-  background: rgba(255,255,255,0.05);
-  padding: 3px 8px;
-  border-radius: 4px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
 
 .cardDate {
   font-size: 0.7rem;
   color: var(--text-muted);
+}
+
+.cardLinkIcon {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.card:hover .cardLinkIcon {
+  color: var(--accent-bronze);
+  opacity: 1;
 }
 
 /* ── List view ───────────────────────────────────────────────────────────── */

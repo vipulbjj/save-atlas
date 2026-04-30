@@ -32,16 +32,16 @@ export default function Home() {
           <div className={styles.heroBackground}></div>
           <div className={`${styles.heroContent} animate-fade-in`}>
             <h1 className={styles.heroTitle}>
-              Your Instagram saves <br />
-              <span className="text-gradient font-serif italic">deserve better</span> than folders.
+              Turn your Instagram saves <br />
+              <span className="text-gradient font-serif italic">into a knowledge base.</span>
             </h1>
             <p className={styles.heroSubtitle}>
-              AI organizes your architecture and design inspiration into a searchable, intelligent knowledge library.
+              SaveAtlas uses AI to organize your bookmarks—from tech stacks and startup advice to travel gems and home design—into a searchable, intelligent library.
             </p>
             <div className={styles.heroActions}>
               <a href="/dashboard" className="btn-primary">
                 <UploadCloud size={18} />
-                Import Saves
+                Build My Library
               </a>
               <a href="/dashboard" className="btn-secondary">
                 View Demo
@@ -64,17 +64,17 @@ export default function Home() {
         <section id="features" className={styles.section}>
           <div className={styles.sectionHeader}>
             <span className={styles.sectionLabel}>The Problem</span>
-            <h2 className={styles.sectionTitle}>From generic folders to intelligent clusters</h2>
+            <h2 className={styles.sectionTitle}>Stop scrolling, start using.</h2>
             <p className="text-[var(--text-secondary)]">
-              Stop losing great ideas in endless generic collections. SaveAtlas understands the visual language of your saves and reorganizes them automatically.
+              Your saves are a goldmine of information, but Instagram makes them impossible to find. SaveAtlas surface the value in your bookmarks automatically.
             </p>
           </div>
 
           <div className={styles.comparisonContainer}>
             <div className={`${styles.comparisonBox} before`}>
-              <h3>Before: Messy Folders</h3>
+              <h3>Instagram: Unorganized</h3>
               <div className={styles.folderList}>
-                {["Architecture", "House Ideas", "Cool Stuff", "Random", "Materials"].map((folder, i) => (
+                {["Saved Posts", "All Posts", "Collections"].map((folder, i) => (
                   <div key={i} className={styles.folderItem}>
                     <Folder size={18} />
                     {folder}
@@ -86,9 +86,9 @@ export default function Home() {
             <ArrowRight className="hidden md:block text-[var(--accent-bronze)]" size={32} />
 
             <div className={`${styles.comparisonBox} ${styles.after}`}>
-              <h3>After: Smart Architecture Taxonomy</h3>
+              <h3>SaveAtlas: Intelligent Taxonomy</h3>
               <div className={styles.clusterList}>
-                {["Residential Facades", "Japandi Interiors", "Natural Stone", "Concrete Textures", "Minimalist Bathrooms", "Hidden Lighting", "Courtyard Design"].map((tag, i) => (
+                {["Tech & AI Repos", "YC Startup Lessons", "Lifestyle Growth", "Travel Itineraries", "Home Design Details", "Business Strategies"].map((tag, i) => (
                   <div key={i} className={styles.clusterTag}>
                     <Sparkles size={14} className="text-[var(--accent-emerald)]" />
                     {tag}

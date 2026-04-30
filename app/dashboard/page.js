@@ -12,11 +12,12 @@ import {
 
 const CATEGORIES = [
   { id: "all", label: "All Saves", icon: <LayoutGrid size={15} /> },
-  { id: "interiors", label: "Interiors", icon: <Home size={15} /> },
-  { id: "facades", label: "Facades", icon: <Building size={15} /> },
-  { id: "landscape", label: "Landscape", icon: <TreePine size={15} /> },
-  { id: "materials", label: "Materials", icon: <Box size={15} /> },
-  { id: "structural", label: "Structural", icon: <Triangle size={15} /> },
+  { id: "tech-ai", label: "Tech & AI", icon: <Sparkles size={15} />, color: "#818cf8" },
+  { id: "business", label: "Business & Startups", icon: <Building size={15} />, color: "#fbbf24" },
+  { id: "lifestyle", label: "Lifestyle & Growth", icon: <Heart size={15} />, color: "#f87171" },
+  { id: "travel", label: "Travel & Stays", icon: <TreePine size={15} />, color: "#34d399" },
+  { id: "home-design", label: "Home & Design", icon: <Home size={15} />, color: "#fb923c" },
+  { id: "other", label: "Everything Else", icon: <Layers size={15} />, color: "#94a3b8" },
 ];
 
 const MEDIA_FILTERS = [
@@ -33,12 +34,14 @@ const SORT_OPTIONS = [
 
 function inferCategory(save) {
   const text = `${save.caption || ""} ${(save.hashtags || []).join(" ")}`.toLowerCase();
-  if (text.match(/interior|living|bedroom|kitchen|sofa|furniture|decor|room/)) return "interiors";
-  if (text.match(/facade|exterior|house|villa|building|architect/)) return "facades";
-  if (text.match(/garden|landscape|tree|plant|outdoor|courtyard|nature/)) return "landscape";
-  if (text.match(/stair|ceiling|floor|material|stone|concrete|wood|metal/)) return "materials";
-  if (text.match(/structural|beam|column|frame|bridge|engineer/)) return "structural";
-  return "facades";
+  
+  if (text.match(/ai|claude|gpt|ai|code|python|repo|efficient|logic|tech/)) return "tech-ai";
+  if (text.match(/startup|yc|founder|marketing|brand|budget|startup|founder|yc|paul graham/)) return "business";
+  if (text.match(/love|relationship|maa|life|secrets|perspective|child|family|mindset|growth/)) return "lifestyle";
+  if (text.match(/travel|trip|road trip|vacation|staycation|stay|dividends|eiffel|visit/)) return "travel";
+  if (text.match(/home|interior|living|bedroom|kitchen|sofa|furniture|decor|room|villa|facade|architect/)) return "home-design";
+  
+  return "other";
 }
 
 function formatDate(iso) {
@@ -361,38 +364,62 @@ export default function Dashboard() {
           {/* Grid view */}
           {!loading && filteredSaves.length > 0 && viewMode === "grid" && (
             <div className={styles.grid}>
-              {filteredSaves.map((save, i) => (
-                <div
-                  key={save.id || i}
-                  className={styles.card}
-                  style={{ "--delay": `${(i % 12) * 40}ms` }}
-                  onClick={() => setSelectedSave(save)}
-                >
-                  <div className={styles.cardThumb}>
-                    {save.thumbnail_url ? (
-                      <img
-                        src={save.thumbnail_url}
-                        alt={save.caption || "Save"}
-                        crossOrigin="anonymous"
-                        loading="lazy"
-                        onError={(e) => { e.target.parentElement.classList.add(styles.noImage); }}
-                      />
-                    ) : (
-                      <div className={styles.cardNoImg}><ImageIcon size={24} /></div>
-                    )}
-                    {save.media_type === "VIDEO" && <span className={styles.cardBadgeVideo}><Film size={11} /> Video</span>}
-                    {save.media_type === "CAROUSEL" && <span className={styles.cardBadgeCarousel}><Layers size={11} /> Album</span>}
-                  </div>
-                  <div className={styles.cardBody}>
-                    {save.username && <span className={styles.cardUser}>@{save.username}</span>}
-                    {save.caption && <p className={styles.cardCaption}>{save.caption.slice(0, 80)}{save.caption.length > 80 ? "…" : ""}</p>}
-                    <div className={styles.cardFooter}>
-                      <span className={styles.cardCat}>{CATEGORIES.find(c => c.id === inferCategory(save))?.label || "Architecture"}</span>
-                      <span className={styles.cardDate}>{formatDate(save.timestamp)}</span>
+              {filteredSaves.map((save, i) => {
+                const cat = CATEGORIES.find(c => c.id === inferCategory(save)) || CATEGORIES[CATEGORIES.length - 1];
+                return (
+                  <div
+                    key={save.id || i}
+                    className={styles.card}
+                    style={{ "--delay": `${(i % 12) * 40}ms` }}
+                    onClick={() => setSelectedSave(save)}
+                  >
+                    <div className={styles.cardThumb}>
+                      {save.thumbnail_url ? (
+                        <img
+                          src={save.thumbnail_url}
+                          alt={save.caption || "Save"}
+                          crossOrigin="anonymous"
+                          loading="lazy"
+                          onError={(e) => { 
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className={styles.cardPlaceholder} 
+                        style={{ 
+                          display: save.thumbnail_url ? 'none' : 'flex',
+                          background: `linear-gradient(135deg, ${cat.color}22, ${cat.color}44)` 
+                        }}
+                      >
+                        <div className={styles.placeholderIcon} style={{ color: cat.color }}>
+                          {cat.icon}
+                        </div>
+                        <p className={styles.placeholderText}>
+                          {save.caption?.slice(0, 120) || "Knowledge Entry"}
+                        </p>
+                      </div>
+                      {save.media_type === "VIDEO" && <span className={styles.cardBadgeVideo}><Film size={11} /> Video</span>}
+                    </div>
+                    <div className={styles.cardBody}>
+                      <div className={styles.cardMeta}>
+                        <span className={styles.cardUser} style={{ color: cat.color }}>
+                          {save.username ? `@${save.username}` : "Collection"}
+                        </span>
+                        <span className={styles.cardCat}>{cat.label}</span>
+                      </div>
+                      {save.caption && <p className={styles.cardCaption}>{save.caption.slice(0, 80)}{save.caption.length > 80 ? "…" : ""}</p>}
+                      <div className={styles.cardFooter}>
+                        <span className={styles.cardDate}>{formatDate(save.timestamp)}</span>
+                        {save.permalink && (
+                          <div className={styles.cardLinkIcon}><ExternalLink size={12} /></div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
