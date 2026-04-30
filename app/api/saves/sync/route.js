@@ -25,35 +25,42 @@ export async function POST() {
   try {
     const supabase = getSupabase();
     
-    // Fetch all records for the user that might need fixing
+    // Fetch records that haven't been fixed yet
     const { data: saves, error } = await supabase
       .from('saves')
       .select('*')
-      .eq('user_id', DEFAULT_USER_ID);
+      .eq('user_id', DEFAULT_USER_ID)
+      .eq('ai_processed', false)
+      .limit(200);
 
     if (error) throw error;
 
     let fixedCount = 0;
     
     for (const save of saves) {
-      const fixedCaption = fixEncoding(save.caption);
-      const hashtags = (save.hashtags || []).map(h => fixEncoding(h));
-      const category = inferCategory(fixedCaption, hashtags);
-      
-      const { error: updateError } = await supabase
-        .from('saves')
-        .update({
-          caption: fixedCaption,
-          hashtags: hashtags,
-          ai_category: category,
-          ai_processed: true
-        })
-        .eq('id', save.id);
+      try {
+        const fixedCaption = fixEncoding(save.caption);
+        const hashtags = (save.hashtags || []).map(h => fixEncoding(h));
+        const category = inferCategory(fixedCaption, hashtags);
         
-      if (!updateError) fixedCount++;
+        const { error: updateError } = await supabase
+          .from('saves')
+          .update({
+            caption: fixedCaption,
+            hashtags: hashtags,
+            ai_category: category,
+            ai_processed: true
+          })
+          .eq('id', save.id);
+          
+        if (!updateError) fixedCount++;
+      } catch (e) {
+        console.error(`Failed to fix save ${save.id}:`, e);
+      }
     }
 
-    return NextResponse.json({ ok: true, fixed: fixedCount });
+    return NextResponse.json({ ok: true, fixed: fixedCount, remaining: true });
+
   } catch (err) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
