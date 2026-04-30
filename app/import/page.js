@@ -159,8 +159,34 @@ function tryParseFormat(raw, rawText) {
   const mediaItems = raw?.media || raw?.items || [];
   for (const item of mediaItems) {
     if (item?.uri) {
-      const m = item.uri.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
+      const m = item.uri.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
       if (m) add(m[1], item.creation_timestamp || item.timestamp, item?.title);
+    }
+  }
+  if (saves.length) return saves;
+
+  // Format D: 2025-2026 export — array of { timestamp, label_values: [{ label, href, value }] }
+  if (Array.isArray(raw)) {
+    for (const entry of raw) {
+      const ts = entry?.timestamp || null;
+      const labelValues = entry?.label_values || [];
+      let href = null;
+      let caption = null;
+      for (const lv of labelValues) {
+        const label = (lv?.label || "").toLowerCase();
+        if ((label === "url" || label === "link") && lv?.href) href = lv.href;
+        if (label === "caption" && lv?.value) caption = lv.value;
+      }
+      if (!href) {
+        // fallback: any href in label_values
+        for (const lv of labelValues) {
+          if (lv?.href && lv.href.includes("instagram.com")) { href = lv.href; break; }
+        }
+      }
+      if (href) {
+        const m = href.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
+        if (m) add(m[1], ts, caption || entry?.title);
+      }
     }
   }
 
@@ -169,7 +195,7 @@ function tryParseFormat(raw, rawText) {
 
 // ── Last resort: regex sweep across raw text ───────────────────────────────
 function extractUrlsByRegex(text) {
-  const urlPattern = /instagram\.com\/p\/([A-Za-z0-9_-]+)/g;
+  const urlPattern = /instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/g;
   const tsPattern = /"timestamp"\s*:\s*(\d+)/g;
 
   const shortcodes = [];
