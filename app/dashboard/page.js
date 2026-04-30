@@ -523,11 +523,12 @@ export default function Dashboard() {
               {filteredSaves.map((save, i) => (
                 <div key={save.id || i} className={styles.listRow} onClick={() => setSelectedSave(save)}>
                   <div className={styles.listThumb}>
-                    {save.thumbnail_url ? (
-                      <img src={save.thumbnail_url} alt="" crossOrigin="anonymous" loading="lazy" />
-                    ) : (
-                      <ImageIcon size={18} />
-                    )}
+                    <img 
+                      src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=200&h=200&fit=cover`} 
+                      alt="" 
+                      referrerPolicy="no-referrer"
+                      loading="lazy" 
+                    />
                   </div>
                   <div className={styles.listMeta}>
                     <span className={styles.listUser}>@{save.username || "unknown"}</span>
@@ -543,6 +544,8 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          )}
+
           {/* Pagination */}
           {hasMore && filteredSaves.length > 0 && (
             <div className={styles.loadMoreWrap}>
@@ -556,7 +559,8 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      </div>
+      </main>
+    </div>
 
       {/* ── Detail Modal ── */}
       {selectedSave && (
