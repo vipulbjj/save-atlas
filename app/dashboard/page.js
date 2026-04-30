@@ -61,6 +61,22 @@ function formatDate(iso) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function Highlight({ text, query }) {
+  if (!query || !text) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${query})`, "gi"));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <mark key={i} className={styles.highlight}>{part}</mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
+
 function timeAgo(iso) {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
@@ -453,7 +469,11 @@ export default function Dashboard() {
                         </span>
                         <span className={styles.cardCat}>{cat.label}</span>
                       </div>
-                      {save.caption && <p className={styles.cardCaption}>{fixEncoding(save.caption).slice(0, 80)}{save.caption.length > 80 ? "…" : ""}</p>}
+                      {save.caption && (
+                        <p className={styles.cardCaption}>
+                          <Highlight text={fixEncoding(save.caption)} query={searchQuery} />
+                        </p>
+                      )}
                       <div className={styles.cardFooter}>
                         <span className={styles.cardDate}>{formatDate(save.timestamp)}</span>
                         {save.permalink && (
