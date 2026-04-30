@@ -46,7 +46,7 @@ export async function POST(request) {
       likes: 0,
       location: null,
       permalink: save.permalink,
-      timestamp: save.timestamp,
+      timestamp: toISO(save.timestamp),
       ai_processed: false,
     }));
 
@@ -97,4 +97,19 @@ export async function POST(request) {
 function extractHashtags(text) {
   if (!text) return [];
   return (text.match(/#[a-zA-Z0-9_]+/g) || []).map((h) => h.toLowerCase());
+}
+
+// Convert any timestamp representation to a Postgres-safe ISO string
+function toISO(ts) {
+  if (!ts) return new Date().toISOString();
+  const n = Number(ts);
+  if (!isNaN(n) && n > 1_000_000_000 && n < 9_999_999_999) {
+    return new Date(n * 1000).toISOString(); // Unix seconds → ISO
+  }
+  if (!isNaN(n) && n > 9_999_999_999) {
+    return new Date(n).toISOString(); // Unix milliseconds → ISO
+  }
+  // Already a string like "2026-04-30T..." — validate it
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
