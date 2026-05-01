@@ -121,6 +121,8 @@ export default function Dashboard() {
   const fetchSaves = useCallback(async (query = "", cat = "all", sub = "all", coll = "all", reset = false) => {
     try {
       setLoading(true);
+      if (reset) setSaves([]); // Immediate clear for snappy feel
+      
       const currentPage = reset ? 1 : page;
       const params = new URLSearchParams({ 
         limit: "50", 
@@ -212,6 +214,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     const handler = (e) => {
+      // Cmd+K or Ctrl+K to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      
       if (e.key === "/" && document.activeElement !== searchRef.current) {
         if (document.activeElement.tagName !== "INPUT") {
           e.preventDefault();
@@ -393,7 +401,12 @@ export default function Dashboard() {
             </div>
           )}
 
-          {viewMode === "grid" ? (
+          {loading && saves.length === 0 ? (
+            <div className={styles.loaderWrap}>
+              <Loader2 className={styles.spinning} size={40} />
+              <p>AI is scouring your library...</p>
+            </div>
+          ) : viewMode === "grid" ? (
             <div className={styles.grid}>
               {filteredSaves.map((save, i) => {
                 const cat = CATEGORIES.find(c => c.id === inferCategory(save)) || CATEGORIES[CATEGORIES.length - 1];
