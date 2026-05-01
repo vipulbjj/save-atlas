@@ -9,6 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { getSupabase, DEFAULT_USER_ID } from '@/lib/supabase';
+import { expandQuery } from '@/lib/aiSearch';
 
 export async function GET(request) {
   try {
@@ -38,7 +39,6 @@ export async function GET(request) {
     }
 
     if (search) {
-      const { expandQuery } = require('@/lib/aiSearch');
       const expanded = expandQuery(search);
       // We use 'plain' or 'websearch' for the primary term, 
       // but 'tsquery' style for the expansion if we want absolute matching.
