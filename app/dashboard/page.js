@@ -297,12 +297,13 @@ export default function Dashboard() {
 
       <main className={styles.main}>
         <header className={styles.header}>
-          <div className={styles.searchBar}>
+          <div className={`${styles.searchBar} ${searchQuery ? styles.searchBarActive : ""}`}>
+            <div className={styles.aiGlow}></div>
             <Search className={styles.searchIcon} size={18} />
             <input 
               ref={searchRef}
               type="text" 
-              placeholder="Search your knowledge... ( / )" 
+              placeholder="Search library with AI intelligence..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -311,6 +312,10 @@ export default function Dashboard() {
                 <X size={14} />
               </button>
             )}
+            <div className={styles.searchHint}>
+              <Sparkles size={10} />
+              <span>⌘K</span>
+            </div>
           </div>
         </header>
 

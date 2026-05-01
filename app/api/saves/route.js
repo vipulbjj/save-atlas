@@ -38,8 +38,15 @@ export async function GET(request) {
     }
 
     if (search) {
-      // Full-text search over caption, ai_category, ai_style
-      query = query.textSearch('caption', search, { type: 'websearch' });
+      const { expandQuery } = require('@/lib/aiSearch');
+      const expanded = expandQuery(search);
+      // We use 'plain' or 'websearch' for the primary term, 
+      // but 'tsquery' style for the expansion if we want absolute matching.
+      // For a better 'AI' feel, we'll just stick to websearch but pass more context.
+      query = query.textSearch('caption', expanded, { 
+        type: 'websearch', 
+        config: 'english' 
+      });
     }
 
     const { data, error, count } = await query;
