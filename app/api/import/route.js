@@ -62,6 +62,12 @@ export async function POST(request) {
 
     const userId = user.id;
 
+    // Ensure the user exists in public.users to satisfy the foreign key constraint
+    await supabase.from('users').upsert({
+      id: userId,
+      email: user.email,
+    }, { onConflict: 'id' });
+
     // Build Supabase records — no oEmbed (avoids timeout)
     const records = saves.map((save) => {
       const rawCaption = save.caption || save.title || '';

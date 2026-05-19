@@ -31,6 +31,12 @@ export async function POST() {
     }
 
     const userId = user.id;
+
+    // Ensure the user exists in public.users to satisfy the foreign key constraint
+    await supabase.from('users').upsert({
+      id: userId,
+      email: user.email,
+    }, { onConflict: 'id' });
     
     // Fetch records that haven't been fixed yet
     const { data: saves, error } = await supabase
