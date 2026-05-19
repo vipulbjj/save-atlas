@@ -222,8 +222,18 @@ export default function Dashboard() {
     const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
     if (isDemo) {
       setGlobalStats(DEMO_STATS);
-      setSaves(DEMO_SAVES);
-      setTotalSaves(DEMO_SAVES.length);
+      
+      let filteredDemo = DEMO_SAVES;
+      if (activeCategory !== "all") {
+        filteredDemo = filteredDemo.filter(s => inferCategory(s) === activeCategory);
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        filteredDemo = filteredDemo.filter(s => (s.caption || "").toLowerCase().includes(q));
+      }
+      
+      setSaves(filteredDemo);
+      setTotalSaves(filteredDemo.length);
       setHasMore(false);
       setLoading(false);
       return;
