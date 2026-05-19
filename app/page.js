@@ -19,9 +19,9 @@ export default function Home() {
         <div className={styles.logo}>
           SaveAtlas <span className={styles.logoDot}></span>
         </div>
-        <nav className="flex gap-8 items-center text-sm font-medium">
-          <a href="#features" className="hover:text-white text-[var(--text-secondary)] transition-colors">Features</a>
-          <a href="#how-it-works" className="hover:text-white text-[var(--text-secondary)] transition-colors">How it Works</a>
+        <nav className={styles.nav}>
+          <a href="#features" className={styles.navLink}>Features</a>
+          <a href="#how-it-works" className={styles.navLink}>How it Works</a>
           <a href="/login" className="btn-secondary">Log In</a>
         </nav>
       </header>
@@ -109,16 +109,16 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+          <div className={styles.howItWorksGrid}>
             {[
               { num: "01", title: "Request Data", desc: "Download your saved posts in JSON format directly from your Instagram settings." },
               { num: "02", title: "Drop the ZIP", desc: "Upload the ZIP file. Our local parser extracts your saves securely without uploading the file." },
               { num: "03", title: "AI Magic", desc: "Our AI automatically categorizes and tags your saves into a beautiful visual library." },
             ].map((step, i) => (
-              <div key={i} className="p-8 rounded-2xl bg-[var(--surface-primary)] border border-[var(--border-color)] flex flex-col gap-4">
-                <div className="text-2xl font-serif italic text-[var(--accent-bronze)]">{step.num}</div>
-                <h3 className="text-xl font-medium">{step.title}</h3>
-                <p className="text-[var(--text-secondary)] leading-relaxed">{step.desc}</p>
+              <div key={i} className={styles.howItWorksCard}>
+                <div className={styles.howItWorksNumber}>{step.num}</div>
+                <h3 className={styles.howItWorksTitle}>{step.title}</h3>
+                <p className={styles.howItWorksDesc}>{step.desc}</p>
               </div>
             ))}
           </div>
