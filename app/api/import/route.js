@@ -28,9 +28,9 @@ function fixEncoding(str) {
   if (!str) return str;
   try {
     const bytes = new Uint8Array(str.split('').map((c) => c.charCodeAt(0)));
-    return new TextDecoder('utf-8').decode(bytes);
+    return new TextDecoder('utf-8').decode(bytes).replace(/\0/g, '');
   } catch (e) {
-    return str;
+    return str.replace(/\0/g, '');
   }
 }
 
@@ -65,7 +65,7 @@ export async function POST(request) {
     // Build Supabase records — no oEmbed (avoids timeout)
     const records = saves.map((save) => {
       const rawCaption = save.caption || save.title || '';
-      const fixedCaption = fixEncoding(rawCaption);
+      const fixedCaption = fixEncoding(rawCaption).replace(/\0/g, '');
       const hashtags = extractHashtags(fixedCaption);
       const category = inferCategory(fixedCaption, hashtags);
 
