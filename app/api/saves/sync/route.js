@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabase, DEFAULT_USER_ID } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 
 function fixEncoding(str) {
   if (!str) return str;
@@ -23,13 +23,20 @@ function inferCategory(caption, hashtags) {
 
 export async function POST() {
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = user.id;
     
     // Fetch records that haven't been fixed yet
     const { data: saves, error } = await supabase
       .from('saves')
       .select('*')
-      .eq('user_id', DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .eq('ai_processed', false)
       .limit(200);
 

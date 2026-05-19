@@ -5,20 +5,44 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Mail, Lock, Loader2, Sparkles } from "lucide-react";
 import styles from "./login.module.css";
 
+import { createClient } from "@/lib/supabase-client";
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg("");
     
-    // Simulate network delay for premium feel
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1200);
+    const supabase = createClient();
+    
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        // Proceed to dashboard, user session should be created
+        router.push("/dashboard");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to authenticate.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -40,11 +64,16 @@ export default function LoginPage() {
             <div className={styles.iconWrapper}>
               <Sparkles size={24} className="text-[var(--accent-bronze)]" />
             </div>
-            <h1 className={styles.title}>Welcome back</h1>
-            <p className={styles.subtitle}>Enter your details to access your library</p>
+            <h1 className={styles.title}>{isSignUp ? "Create an account" : "Welcome back"}</h1>
+            <p className={styles.subtitle}>{isSignUp ? "Enter your details to create your library" : "Enter your details to access your library"}</p>
           </div>
 
-          <form onSubmit={handleLogin} className={styles.form}>
+          <form onSubmit={handleAuth} className={styles.form}>
+            {errorMsg && (
+              <div style={{ color: '#ff6b6b', background: 'rgba(255,107,107,0.1)', padding: '12px', borderRadius: '8px', fontSize: '0.9rem', marginBottom: '16px' }}>
+                {errorMsg}
+              </div>
+            )}
             <div className={styles.inputGroup}>
               <label htmlFor="email">Email address</label>
               <div className={styles.inputWrapper}>
@@ -83,14 +112,17 @@ export default function LoginPage() {
                 <Loader2 size={18} className="animate-spin" />
               ) : (
                 <>
-                  Sign In <ArrowRight size={18} />
+                  {isSignUp ? "Sign Up" : "Sign In"} <ArrowRight size={18} />
                 </>
               )}
             </button>
           </form>
 
           <p className={styles.signupText}>
-            Don't have an account? <a href="#">Request Access</a>
+            {isSignUp ? "Already have an account? " : "Don't have an account? "}
+            <a href="#" onClick={(e) => { e.preventDefault(); setIsSignUp(!isSignUp); setErrorMsg(""); }}>
+              {isSignUp ? "Sign In" : "Request Access"}
+            </a>
           </p>
         </div>
       </main>

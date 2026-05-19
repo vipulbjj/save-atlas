@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getSupabase, DEFAULT_USER_ID } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 import { expandQuery } from '@/lib/aiSearch';
 
 export async function GET(request) {
@@ -21,12 +21,19 @@ export async function GET(request) {
     const limit    = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const offset   = (page - 1) * limit;
 
-    const supabase = getSupabase();
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = user.id;
 
     let query = supabase
       .from('saves')
       .select('*', { count: 'exact' })
-      .eq('user_id', DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .order('timestamp', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -59,13 +66,13 @@ export async function GET(request) {
     const { count: photoCount } = await supabase
       .from('saves')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .eq('media_type', 'IMAGE');
     
     const { count: videoCount } = await supabase
       .from('saves')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .eq('media_type', 'VIDEO');
 
     return NextResponse.json({

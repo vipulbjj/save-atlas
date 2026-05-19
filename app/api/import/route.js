@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getSupabase, DEFAULT_USER_ID } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -53,6 +53,15 @@ export async function POST(request) {
       return NextResponse.json({ ok: false, error: 'No saves provided.' }, { status: 400 });
     }
 
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = user.id;
+
     // Build Supabase records — no oEmbed (avoids timeout)
     const records = saves.map((save) => {
       const rawCaption = save.caption || save.title || '';
@@ -61,7 +70,7 @@ export async function POST(request) {
       const category = inferCategory(fixedCaption, hashtags);
 
       return {
-        user_id: DEFAULT_USER_ID,
+        user_id: userId,
         instagram_id: save.shortcode,
         username: null,
         caption: fixedCaption || null,
@@ -78,13 +87,12 @@ export async function POST(request) {
       };
     });
 
-    const supabase = getSupabase();
-    
     // Fetch already-stored instagram_ids to deduplicate without needing a unique constraint
     const shortcodes = records.map((r) => r.instagram_id);
     const { data: existing } = await supabase
       .from('saves')
       .select('instagram_id')
+      .eq('user_id', userId)
       .in('instagram_id', shortcodes);
 
     const existingSet = new Set((existing || []).map((r) => r.instagram_id));

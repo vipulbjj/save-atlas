@@ -1,36 +1,43 @@
 import { NextResponse } from 'next/server';
-import { getSupabase, DEFAULT_USER_ID } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const supabase = getSupabase();
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userId = user.id;
 
     // 1. Total Saves
     const { count: total } = await supabase
       .from('saves')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', DEFAULT_USER_ID);
+      .eq('user_id', userId);
 
     // 2. Media Type Counts
     const { count: photos } = await supabase
       .from('saves')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .eq('media_type', 'IMAGE');
 
     const { count: videos } = await supabase
       .from('saves')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .eq('media_type', 'VIDEO');
 
     // 3. Category & Subcategory Counts
     const { data: catData } = await supabase
       .from('saves')
       .select('ai_category, ai_subcategory')
-      .eq('user_id', DEFAULT_USER_ID);
+      .eq('user_id', userId);
 
     const categories = {};
     const subCategories = {};
