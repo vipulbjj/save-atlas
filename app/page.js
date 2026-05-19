@@ -43,7 +43,7 @@ export default function Home() {
                 <UploadCloud size={18} />
                 Build My Library
               </a>
-              <a href="/dashboard" className="btn-secondary">
+              <a href="/dashboard?demo=true" className="btn-secondary">
                 View Demo
               </a>
             </div>

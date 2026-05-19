@@ -87,6 +87,67 @@ const SUBCATEGORIES = {
   ]
 };
 
+const DEMO_SAVES = [
+  {
+    id: "demo_1",
+    instagram_id: "demo1",
+    thumbnail_url: "/modern_villa_facade_1777051470979.png",
+    username: "architecture_daily",
+    caption: "Stunning modern minimal villa with raw concrete and expansive glass #architecture #minimal",
+    ai_category: "home-design",
+    likes: 1,
+    timestamp: new Date().toISOString()
+  },
+  {
+    id: "demo_2",
+    instagram_id: "demo2",
+    thumbnail_url: "/japandi_interior_1777051495653.png",
+    username: "japandi_homes",
+    caption: "Perfect blend of Japanese minimalism and Scandinavian functionality. The warm wood tones are incredible.",
+    ai_category: "home-design",
+    likes: 0,
+    timestamp: new Date(Date.now() - 86400000).toISOString()
+  },
+  {
+    id: "demo_3",
+    instagram_id: "demo3",
+    thumbnail_url: "/concrete_staircase_1777051518775.png",
+    username: "brutal_architecture",
+    caption: "Board-formed concrete floating staircase detail. Brutal yet refined.",
+    ai_category: "home-design",
+    likes: 1,
+    timestamp: new Date(Date.now() - 186400000).toISOString()
+  },
+  {
+    id: "demo_4",
+    instagram_id: "demo4",
+    thumbnail_url: "/tropical_courtyard_1777051537632.png",
+    username: "tropical_spaces",
+    caption: "Bringing the outside in. This internal courtyard is an absolute dream oasis.",
+    ai_category: "travel",
+    likes: 0,
+    timestamp: new Date(Date.now() - 286400000).toISOString()
+  },
+  {
+    id: "demo_5",
+    instagram_id: "demo5",
+    thumbnail_url: "/wooden_ceiling_1777051553645.png",
+    username: "interior_details",
+    caption: "Slatted wood ceiling treatment that completely transforms the acoustic and visual space of this room.",
+    ai_category: "home-design",
+    likes: 0,
+    timestamp: new Date(Date.now() - 386400000).toISOString()
+  }
+];
+
+const DEMO_STATS = {
+  total: 5,
+  photos: 5,
+  videos: 0,
+  categories: { "home-design": 4, "travel": 1 },
+  subCategories: { "home-design": { "architecture": 2, "interiors": 2 }, "travel": { "stays": 1 } }
+};
+
 export default function Dashboard() {
   const [saves, setSaves] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -158,6 +219,16 @@ export default function Dashboard() {
   }, [page]);
 
   useEffect(() => { 
+    const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
+    if (isDemo) {
+      setGlobalStats(DEMO_STATS);
+      setSaves(DEMO_SAVES);
+      setTotalSaves(DEMO_SAVES.length);
+      setHasMore(false);
+      setLoading(false);
+      return;
+    }
+
     fetchStats();
     fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, true); 
     setPage(1);
@@ -410,6 +481,16 @@ export default function Dashboard() {
             <div className={styles.loaderWrap}>
               <Loader2 className={styles.spinning} size={40} />
               <p>AI is scouring your library...</p>
+            </div>
+          ) : saves.length === 0 ? (
+            <div className={styles.emptyState}>
+              <Layers size={48} className={styles.emptyIcon} />
+              <h2>Your library is empty</h2>
+              <p>Import your Instagram saves to start building your AI-powered knowledge base.</p>
+              <a href="/import" className={styles.emptyBtn}>
+                <UploadCloud size={18} />
+                Upload Instagram Data
+              </a>
             </div>
           ) : viewMode === "grid" ? (
             <div className={styles.grid}>
