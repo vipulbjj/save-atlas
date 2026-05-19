@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Search, Grid as GridIcon, List, SortAsc, RefreshCw, ChevronDown, 
   Settings, Bell, Layers, ExternalLink, Heart, Clock, X, Image, Film, 
-  ArrowUpRight, Sparkles, Lightbulb, Loader2
+  ArrowUpRight, Sparkles, Lightbulb, Loader2, UploadCloud
 } from "lucide-react";
 import styles from "./dashboard.module.css";
 
@@ -251,6 +251,11 @@ export default function Dashboard() {
           <a href="/" className={styles.logo}>
             <span className={styles.logoMark}>SA</span>
             <span>SaveAtlas</span>
+          </a>
+          
+          <a href="/import" className={styles.uploadBtn}>
+            <UploadCloud size={16} />
+            Upload Instagram Data
           </a>
 
           <nav className={styles.nav}>

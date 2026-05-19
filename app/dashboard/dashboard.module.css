@@ -59,6 +59,27 @@
   font-size: 0.9rem;
 }
 
+.uploadBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: white;
+  color: black;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  margin: 0 12px 32px 12px;
+  transition: var(--transition);
+}
+
+.uploadBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
+}
+
 .nav {
   flex: 1;
 }
