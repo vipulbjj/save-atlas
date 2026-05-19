@@ -17,6 +17,8 @@ export async function GET(request) {
     const category = searchParams.get('category');
     const search   = searchParams.get('search');
     const subcategory = searchParams.get('subcategory');
+    const mediaType = searchParams.get('media_type');
+    const collection = searchParams.get('collection');
     const page     = parseInt(searchParams.get('page') || '1', 10);
     const limit    = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const offset   = (page - 1) * limit;
@@ -43,6 +45,20 @@ export async function GET(request) {
 
     if (subcategory && subcategory !== 'all') {
       query = query.eq('ai_subcategory', subcategory);
+    }
+
+    if (mediaType && mediaType !== 'all') {
+      query = query.eq('media_type', mediaType);
+    }
+
+    if (collection && collection !== 'all') {
+      if (collection === 'favourites') {
+        query = query.gt('likes', 0);
+      } else if (collection === 'inspiration') {
+        query = query.in('ai_category', ['home-design', 'tech-ai']);
+      } else if (collection === 'highlights') {
+        query = query.or('caption.ilike.%#highlight%,caption.ilike.%excellent%,caption.ilike.%best%');
+      }
     }
 
     if (search) {

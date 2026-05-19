@@ -179,7 +179,7 @@ export default function Dashboard() {
     }
   };
 
-  const fetchSaves = useCallback(async (query = "", cat = "all", sub = "all", coll = "all", reset = false) => {
+  const fetchSaves = useCallback(async (query = "", cat = "all", sub = "all", coll = "all", media = "all", reset = false) => {
     try {
       setLoading(true);
       if (reset) setSaves([]); // Immediate clear for snappy feel
@@ -193,6 +193,8 @@ export default function Dashboard() {
       if (query) params.set("search", query);
       if (cat !== "all") params.set("category", cat);
       if (sub !== "all") params.set("subcategory", sub);
+      if (coll !== "all") params.set("collection", coll);
+      if (media !== "all") params.set("media_type", media);
       
       const res = await fetch(`/api/saves?${params}`);
       const data = await res.json();
@@ -240,9 +242,9 @@ export default function Dashboard() {
     }
 
     fetchStats();
-    fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, true); 
+    fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, true); 
     setPage(1);
-  }, [searchQuery, activeCategory, activeSubCategory, activeCollection]);
+  }, [searchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter]);
 
   const loadMore = () => {
     setPage(prev => prev + 1);
@@ -250,7 +252,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (page > 1) {
-      fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, false);
+      fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, false);
     }
   }, [page]);
 
@@ -271,14 +273,7 @@ export default function Dashboard() {
     }
   };
 
-  const filteredSaves = saves
-    .filter((s) => {
-      if (mediaFilter !== "all" && s.media_type !== mediaFilter) return false;
-      if (activeCollection === "favourites" && s.likes === 0) return false;
-      if (activeCollection === "inspiration" && !s.ai_category?.match(/home|tech/)) return false;
-      if (activeCollection === "highlights" && !s.caption?.match(/#highlight|excellent|best/i)) return false;
-      return true;
-    })
+  const filteredSaves = [...saves]
     .sort((a, b) => {
       const ta = new Date(a.timestamp || a.synced_at || 0).getTime();
       const tb = new Date(b.timestamp || b.synced_at || 0).getTime();
