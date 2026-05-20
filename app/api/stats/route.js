@@ -3,6 +3,16 @@ import { createClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
+const CATEGORIES_LIST = ["tech-ai", "business", "lifestyle", "travel", "home-design", "other"];
+
+const SUBCATEGORIES_MAP = {
+  "tech-ai": ["ai-tools", "coding", "productivity", "future"],
+  "business": ["founders", "marketing", "finance", "strategy"],
+  "lifestyle": ["mindset", "family", "wellness", "personal-finance"],
+  "travel": ["destinations", "stays", "tips", "nature"],
+  "home-design": ["architecture", "interiors", "decor", "lighting"]
+};
+
 export async function GET() {
   try {
     const supabase = await createClient();
@@ -33,28 +43,72 @@ export async function GET() {
       .eq('user_id', userId)
       .eq('media_type', 'VIDEO');
 
-    // 3. Category & Subcategory Counts
-    const { data: catData } = await supabase
-      .from('saves')
-      .select('ai_category, ai_subcategory')
-      .eq('user_id', userId);
-
     const categories = {};
     const subCategories = {};
+    const totalCount = total || 0;
 
-    (catData || []).forEach((item) => {
-      const cat = item.ai_category || 'other';
-      categories[cat] = (categories[cat] || 0) + 1;
-      
-      const sub = item.ai_subcategory || 'other';
-      if (!subCategories[cat]) subCategories[cat] = {};
-      subCategories[cat][sub] = (subCategories[cat][sub] || 0) + 1;
-    });
+    // Hybrid performance scaling
+    if (totalCount <= 500) {
+      // 3. Category & Subcategory Counts (In-memory for small/moderate accounts to minimize query roundtrips)
+      const { data: catData } = await supabase
+        .from('saves')
+        .select('ai_category, ai_subcategory')
+        .eq('user_id', userId);
+
+      (catData || []).forEach((item) => {
+        const cat = item.ai_category || 'other';
+        categories[cat] = (categories[cat] || 0) + 1;
+        
+        const sub = item.ai_subcategory || 'other';
+        if (!subCategories[cat]) subCategories[cat] = {};
+        subCategories[cat][sub] = (subCategories[cat][sub] || 0) + 1;
+      });
+    } else {
+      // Index-based Parallel Counts (For large/stress accounts, avoids memory/network/bandwidth bottlenecks completely)
+      const catCountsPromise = Promise.all(
+        CATEGORIES_LIST.map(async (cat) => {
+          const { count } = await supabase
+            .from('saves')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('ai_category', cat);
+          return { cat, count: count || 0 };
+        })
+      );
+
+      const subCountsPromise = Promise.all(
+        Object.entries(SUBCATEGORIES_MAP).flatMap(([cat, subs]) =>
+          subs.map(async (sub) => {
+            const { count } = await supabase
+              .from('saves')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', userId)
+              .eq('ai_category', cat)
+              .eq('ai_subcategory', sub);
+            return { cat, sub, count: count || 0 };
+          })
+        )
+      );
+
+      const [catCounts, subCounts] = await Promise.all([catCountsPromise, subCountsPromise]);
+
+      catCounts.forEach(({ cat, count }) => {
+        if (count > 0) categories[cat] = count;
+      });
+
+      subCounts.forEach(({ cat, sub, count }) => {
+        if (count > 0) {
+          if (!subCategories[cat]) subCategories[cat] = {};
+          subCategories[cat][sub] = count;
+        }
+      });
+    }
 
     return NextResponse.json({
       ok: true,
+      email: user.email,
       stats: {
-        total: total || 0,
+        total: totalCount,
         photos: photos || 0,
         videos: videos || 0,
         categories,
@@ -65,3 +119,4 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
+

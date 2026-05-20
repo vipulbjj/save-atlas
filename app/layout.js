@@ -12,8 +12,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata = {
-  title: "SaveAtlas | AI Architecture Inspiration",
-  description: "Turn saved inspiration into organized intelligence.",
+  title: "SaveAtlas | AI Instagram Saves Organizer",
+  description: "Automatically sync, organize, search, and categorize your Instagram saved posts with AI.",
 };
 
 export default function RootLayout({ children }) {

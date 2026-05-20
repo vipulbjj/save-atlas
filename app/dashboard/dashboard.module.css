@@ -733,3 +733,71 @@
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
 }
+
+/* User Profile Sidebar bottom panel */
+.userProfile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.userEmail {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userBadge {
+  font-size: 0.62rem;
+  color: var(--accent);
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+.logoutBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.logoutBtn:hover {
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff6b6b;
+}

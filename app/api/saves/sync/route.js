@@ -50,7 +50,8 @@ export async function POST() {
 
     let fixedCount = 0;
     
-    for (const save of saves) {
+    // Execute all updates in parallel to prevent gateway timeouts
+    await Promise.all((saves || []).map(async (save) => {
       try {
         const fixedCaption = fixEncoding(save.caption);
         const hashtags = (save.hashtags || []).map(h => fixEncoding(h));
@@ -66,13 +67,16 @@ export async function POST() {
           })
           .eq('id', save.id);
           
-        if (!updateError) fixedCount++;
+        if (!updateError) {
+          fixedCount++;
+        }
       } catch (e) {
         console.error(`Failed to fix save ${save.id}:`, e);
       }
-    }
+    }));
 
-    return NextResponse.json({ ok: true, fixed: fixedCount, remaining: true });
+    return NextResponse.json({ ok: true, fixed: fixedCount, remaining: (saves || []).length === 200 });
+
 
   } catch (err) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });

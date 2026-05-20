@@ -4,9 +4,10 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Search, Grid as GridIcon, List, SortAsc, RefreshCw, ChevronDown, 
   Settings, Bell, Layers, ExternalLink, Heart, Clock, X, Image, Film, 
-  ArrowUpRight, Sparkles, Lightbulb, Loader2, UploadCloud
+  ArrowUpRight, Sparkles, Lightbulb, Loader2, UploadCloud, LogOut
 } from "lucide-react";
 import styles from "./dashboard.module.css";
+import { createClient } from "@/lib/supabase-client";
 
 // Utility to fix Instagram's garbled UTF-8 encoding (mojibake)
 const fixEncoding = (str) => {
@@ -165,21 +166,65 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [globalStats, setGlobalStats] = useState({ total: 0, photos: 0, videos: 0, categories: {}, subCategories: {} });
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [userEmail, setUserEmail] = useState("");
 
   const searchRef = useRef(null);
   const sortRef = useRef(null);
+  const activeRequestRef = useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
+      if (isDemo) {
+        setUserEmail("demo@saveatlas.com");
+        return;
+      }
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          setUserEmail(user.email);
+        }
+      } catch (err) {
+        console.error("Error fetching user client-side:", err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const fetchStats = async () => {
     try {
       const res = await fetch("/api/stats");
       const data = await res.json();
-      if (data.ok) setGlobalStats(data.stats);
+      if (data.ok) {
+        setGlobalStats(data.stats);
+        if (data.email) setUserEmail(data.email);
+      }
     } catch (err) {
       console.error("Failed to fetch stats:", err);
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+    } catch (err) {
+      console.error("Failed to log out:", err);
+    }
+  };
+
   const fetchSaves = useCallback(async (query = "", cat = "all", sub = "all", coll = "all", media = "all", reset = false) => {
+    const requestId = ++activeRequestRef.current;
     try {
       setLoading(true);
       if (reset) setSaves([]); // Immediate clear for snappy feel
@@ -199,6 +244,11 @@ export default function Dashboard() {
       const res = await fetch(`/api/saves?${params}`);
       const data = await res.json();
       
+      if (requestId !== activeRequestRef.current) {
+        // Discard stale out-of-order response to prevent race conditions
+        return;
+      }
+      
       if (data.ok) {
         const newSaves = data.saves || [];
         if (reset) {
@@ -216,7 +266,9 @@ export default function Dashboard() {
     } catch (err) {
       console.error("Failed to fetch saves:", err);
     } finally {
-      setLoading(false);
+      if (requestId === activeRequestRef.current) {
+        setLoading(false);
+      }
     }
   }, [page]);
 
@@ -229,8 +281,8 @@ export default function Dashboard() {
       if (activeCategory !== "all") {
         filteredDemo = filteredDemo.filter(s => inferCategory(s) === activeCategory);
       }
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
+      if (debouncedSearchQuery) {
+        const q = debouncedSearchQuery.toLowerCase();
         filteredDemo = filteredDemo.filter(s => (s.caption || "").toLowerCase().includes(q));
       }
       
@@ -242,9 +294,9 @@ export default function Dashboard() {
     }
 
     fetchStats();
-    fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, true); 
+    fetchSaves(debouncedSearchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, true); 
     setPage(1);
-  }, [searchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter]);
+  }, [debouncedSearchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter]);
 
   const loadMore = () => {
     setPage(prev => prev + 1);
@@ -252,9 +304,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (page > 1) {
-      fetchSaves(searchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, false);
+      fetchSaves(debouncedSearchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, false);
     }
-  }, [page]);
+  }, [page, debouncedSearchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter]);
 
   const toggleLike = async (e, save) => {
     e.stopPropagation();
@@ -311,13 +363,11 @@ export default function Dashboard() {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  const hasRealData = saves.length > 0;
-
   const statsArr = [
-    { label: "Total Saves", value: globalStats.total || "—" },
-    { label: "Categories", value: hasRealData ? Object.keys(globalStats.categories).length : "—" },
-    { label: "Photos", value: globalStats.photos || "—" },
-    { label: "Videos", value: globalStats.videos || "—" },
+    { label: "Total Saves", value: globalStats.total ?? 0 },
+    { label: "Categories", value: globalStats.categories ? Object.keys(globalStats.categories).length : 0 },
+    { label: "Photos", value: globalStats.photos ?? 0 },
+    { label: "Videos", value: globalStats.videos ?? 0 },
   ];
 
   return (
@@ -376,6 +426,18 @@ export default function Dashboard() {
         </div>
 
         <div className={styles.sidebarBottom}>
+          <div className={styles.userProfile}>
+            <div className={styles.userAvatar}>
+              {(userEmail || "explorer@saveatlas.com")[0].toUpperCase()}
+            </div>
+            <div className={styles.userInfo}>
+              <span className={styles.userEmail}>{userEmail || "explorer@saveatlas.com"}</span>
+              <span className={styles.userBadge}>Premium Member</span>
+            </div>
+            <button className={styles.logoutBtn} onClick={handleLogout} title="Logout">
+              <LogOut size={16} />
+            </button>
+          </div>
           <div className={styles.sidebarStatus}>
             <div className={styles.statusDot}></div>
             <span>System Online</span>
@@ -488,15 +550,35 @@ export default function Dashboard() {
               <p>AI is scouring your library...</p>
             </div>
           ) : saves.length === 0 ? (
-            <div className={styles.emptyState}>
-              <Layers size={48} className={styles.emptyIcon} />
-              <h2>Your library is empty</h2>
-              <p>Import your Instagram saves to start building your AI-powered knowledge base.</p>
-              <a href="/import" className={styles.emptyBtn}>
-                <UploadCloud size={18} />
-                Upload Instagram Data
-              </a>
-            </div>
+            globalStats.total > 0 ? (
+              <div className={styles.emptyState}>
+                <Layers size={48} className={styles.emptyIcon} />
+                <h2>No items match your filters</h2>
+                <p>Try adjusting your search or clearing your active filters to view your saves.</p>
+                <button
+                  className={styles.emptyBtn}
+                  onClick={() => {
+                    setSearchQuery("");
+                    setActiveCategory("all");
+                    setActiveSubCategory("all");
+                    setActiveCollection("all");
+                    setMediaFilter("all");
+                  }}
+                >
+                  Clear All Filters
+                </button>
+              </div>
+            ) : (
+              <div className={styles.emptyState}>
+                <Layers size={48} className={styles.emptyIcon} />
+                <h2>Your library is empty</h2>
+                <p>Import your Instagram saves to start building your AI-powered knowledge base.</p>
+                <a href="/import" className={styles.emptyBtn}>
+                  <UploadCloud size={18} />
+                  Upload Instagram Data
+                </a>
+              </div>
+            )
           ) : viewMode === "grid" ? (
             <div className={styles.grid}>
               {filteredSaves.map((save, i) => {

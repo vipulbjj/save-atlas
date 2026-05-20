@@ -75,12 +75,30 @@ export async function POST(request) {
       const hashtags = extractHashtags(fixedCaption);
       const category = inferCategory(fixedCaption, hashtags);
 
+      // Validate & sanitize media type to prevent database check constraint failure
+      let mediaType = 'IMAGE';
+      const captionText = (fixedCaption || '').toLowerCase();
+      const VIDEO_INDICATORS = [
+        '#reel', '#video', 'reelsinstagram', 'reelvideo', '#shorts', 
+        'reelsindia', 'sound on', '🔊', '🎥', '🎬', '▶️', 
+        'reels.instagram', '#trendingreels', '#reels', 'explorepage'
+      ];
+      const isVideoHeuristic = VIDEO_INDICATORS.some(ind => captionText.includes(ind));
+
+      if (save.permalink?.includes('/reel/') || save.permalink?.includes('/tv/') || isVideoHeuristic) {
+        mediaType = 'VIDEO';
+      }
+
+      if (save.media_type && ['IMAGE', 'VIDEO', 'CAROUSEL'].includes(save.media_type)) {
+        mediaType = save.media_type;
+      }
+
       return {
         user_id: userId,
         instagram_id: save.shortcode,
         username: null,
         caption: fixedCaption || null,
-        media_type: save.permalink?.includes('/reel/') ? 'VIDEO' : 'IMAGE',
+        media_type: mediaType,
         thumbnail_url: null,
         video_url: null,
         hashtags: hashtags,
@@ -93,16 +111,41 @@ export async function POST(request) {
       };
     });
 
-    // Fetch already-stored instagram_ids to deduplicate without needing a unique constraint
-    const shortcodes = records.map((r) => r.instagram_id);
-    const { data: existing } = await supabase
-      .from('saves')
-      .select('instagram_id')
-      .eq('user_id', userId)
-      .in('instagram_id', shortcodes);
+    // Deduplicate records on the backend to avoid processing duplicates
+    const seenOnBackend = new Set();
+    const uniqueRecords = [];
+    for (const record of records) {
+      if (record.instagram_id && !seenOnBackend.has(record.instagram_id)) {
+        seenOnBackend.add(record.instagram_id);
+        uniqueRecords.push(record);
+      }
+    }
 
-    const existingSet = new Set((existing || []).map((r) => r.instagram_id));
-    const newRecords = records.filter((r) => !existingSet.has(r.instagram_id));
+    // Fetch already-stored instagram_ids in chunks to avoid PostgREST URI parameter overflow
+    const existingSet = new Set();
+    const DEDUPE_CHUNK = 500;
+    
+    for (let i = 0; i < uniqueRecords.length; i += DEDUPE_CHUNK) {
+      const chunkRecords = uniqueRecords.slice(i, i + DEDUPE_CHUNK);
+      const chunkShortcodes = chunkRecords.map((r) => r.instagram_id);
+      
+      const { data: existing, error } = await supabase
+        .from('saves')
+        .select('instagram_id')
+        .eq('user_id', userId)
+        .in('instagram_id', chunkShortcodes);
+
+      if (error) {
+        console.error('Deduplication check error:', error);
+        throw error;
+      }
+      
+      if (existing) {
+        existing.forEach((r) => existingSet.add(r.instagram_id));
+      }
+    }
+
+    const newRecords = uniqueRecords.filter((r) => !existingSet.has(r.instagram_id));
 
     let inserted = 0;
     const CHUNK = 500;
@@ -129,6 +172,7 @@ export async function POST(request) {
       total: saves.length,
       message: `Successfully imported ${inserted} saves.`,
     }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+
 
   } catch (err) {
     console.error('Import error:', err);
