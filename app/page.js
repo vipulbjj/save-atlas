@@ -5,13 +5,14 @@ import Image from "next/image";
 import styles from "./page.module.css";
 import { 
   Folder, Sparkles, UploadCloud, Search, ArrowRight, LayoutGrid, 
-  Compass, ShieldCheck, Database, LogOut, LayoutDashboard
+  Compass, ShieldCheck, Database, LogOut, LayoutDashboard, Menu, X
 } from "lucide-react";
 import { createClient } from "@/lib/supabase-client";
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -75,11 +76,51 @@ export default function Home() {
                 </button>
               </>
             ) : (
-              <a href="/login" className={styles.btnSecondary}>Log In</a>
+              <a href="/login?next=%2Fimport" className={styles.btnSecondary}>Log In</a>
             )
           )}
         </nav>
+        <button
+          type="button"
+          className={styles.menuBtn}
+          aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileNavOpen}
+          onClick={() => setMobileNavOpen((o) => !o)}
+        >
+          {mobileNavOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
       </header>
+
+      {mobileNavOpen && (
+        <>
+          <button
+            type="button"
+            className={styles.mobileOverlay}
+            aria-label="Close menu"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <nav className={styles.mobileNav}>
+            <a href="#features" className={styles.mobileNavLink} onClick={() => setMobileNavOpen(false)}>Features</a>
+            <a href="#how-it-works" className={styles.mobileNavLink} onClick={() => setMobileNavOpen(false)}>How it Works</a>
+            <a href="#vision" className={styles.mobileNavLink} onClick={() => setMobileNavOpen(false)}>Vision AI</a>
+            {!loading && (
+              isLoggedIn ? (
+                <>
+                  <a href="/dashboard" className={styles.mobileNavCta} onClick={() => setMobileNavOpen(false)}>Dashboard</a>
+                  <button type="button" className={styles.mobileNavCtaSecondary} onClick={() => { handleLogout(); setMobileNavOpen(false); }}>
+                    Log Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <a href="/login?next=%2Fimport" className={styles.mobileNavCta} onClick={() => setMobileNavOpen(false)}>Sign in to import</a>
+                  <a href="/dashboard?demo=true" className={styles.mobileNavCtaSecondary} onClick={() => setMobileNavOpen(false)}>Explore demo</a>
+                </>
+              )
+            )}
+          </nav>
+        </>
+      )}
 
       <main>
         {/* Section 1 — Hero */}
@@ -90,7 +131,7 @@ export default function Home() {
               <span className={styles.textGradient}>into an intelligent knowledge base.</span>
             </h1>
             <p className={styles.heroSubtitle}>
-              SaveAtlas automatically visualizes and categorizes your bookmarks—from design inspirations and YC startup lessons to travel gems—into a searchable visual library.
+              Works with Instagram&apos;s official data export — no password sharing. Upload your saved-posts ZIP and get a searchable library for travel, startups, design, and more.
             </p>
             <div className={styles.heroActions}>
               {isLoggedIn ? (
@@ -99,16 +140,16 @@ export default function Home() {
                     <LayoutDashboard size={18} />
                     Go to Dashboard
                   </a>
-                  <button onClick={handleLogout} className={styles.btnSecondary}>
-                    <LogOut size={18} />
-                    Log Out Account
-                  </button>
+                  <a href="/import" className={styles.btnSecondary}>
+                    <UploadCloud size={18} />
+                    Import more saves
+                  </a>
                 </>
               ) : (
                 <>
-                  <a href="/import" className={styles.btnPrimary}>
+                  <a href="/login?next=%2Fimport" className={styles.btnPrimary}>
                     <UploadCloud size={18} />
-                    Build My Library
+                    Sign in to import saves
                   </a>
                   <a href="/dashboard?demo=true" className={styles.btnSecondary}>
                     Explore Demo
@@ -116,6 +157,9 @@ export default function Home() {
                 </>
               )}
             </div>
+            {!isLoggedIn && !loading && (
+              <p className={styles.heroHint}>Free account · Step 1 takes about 30 seconds · ZIP parsed locally in your browser</p>
+            )}
           </div>
 
           <div className={styles.heroVisual}>
@@ -288,9 +332,9 @@ export default function Home() {
                 </a>
               ) : (
                 <>
-                  <a href="/import" className={styles.btnPrimary}>
+                  <a href="/login?next=%2Fimport" className={styles.btnPrimary}>
                     <UploadCloud size={18} />
-                    Build My Library
+                    Sign in to import saves
                   </a>
                   <a href="/dashboard?demo=true" className={styles.btnSecondary}>
                     Explore Demo

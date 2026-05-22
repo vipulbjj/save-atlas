@@ -8,19 +8,22 @@ import styles from "./import.module.css";
 const STEPS = [
   {
     number: "01",
-    title: "Request your data from Instagram",
-    description: 'Go to Instagram → Settings → Your activity → Download your information. Choose "Some of your information", select "Saved posts", pick JSON format.',
-    action: { label: "Open Instagram Settings", href: "https://www.instagram.com/download/request/" },
+    title: "Request your Instagram export",
+    description:
+      'Instagram app or web: Settings → Accounts Center → Your information and permissions → Download your information → "Some of your information" → check Saved posts → JSON → Create files.',
+    action: { label: "Open Instagram download page", href: "https://www.instagram.com/download/request/" },
   },
   {
     number: "02",
-    title: "Download the ZIP",
-    description: "Instagram emails you a download link within 24–48 hours. Download the ZIP — no need to extract it.",
+    title: "Download the ZIP when ready",
+    description:
+      "Instagram emails a link (often within 24–48 hours). Download the .zip file — you do not need to unzip it on your phone or computer first.",
   },
   {
     number: "03",
-    title: "Drop it here",
-    description: "We read saved_posts.json directly inside the ZIP in your browser — nothing else is ever uploaded.",
+    title: "Upload here — parsed on your device",
+    description:
+      "We extract saved_posts.json inside your browser. Only the list of post URLs and captions is sent to SaveAtlas — not your full export or Instagram password.",
   },
 ];
 
@@ -338,7 +341,7 @@ export default function ImportPage() {
         <div className={styles.hero}>
           <h1 className={styles.title}>Import your Instagram saves</h1>
           <p className={styles.subtitle}>
-            Upload your official Instagram data export. We read the file locally in your browser — the ZIP is never sent to our servers.
+            Official Instagram export only. Sign in once, drop your ZIP below, and we organize every saved post into categories you can search (try &quot;villa&quot;, &quot;startup&quot;, or &quot;travel&quot;).
           </p>
         </div>
 
@@ -373,7 +376,10 @@ export default function ImportPage() {
                   : "."}
               </p>
               <div className={styles.successActions}>
-                <a href="/dashboard" className={styles.primaryButton}>
+                <a
+                  href={`/dashboard?imported=${encodeURIComponent(String(result?.imported ?? 0))}`}
+                  className={styles.primaryButton}
+                >
                   View my library <ArrowRight size={16} />
                 </a>
                 <button onClick={reset} className={styles.secondaryButton}>

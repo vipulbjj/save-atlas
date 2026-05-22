@@ -38,17 +38,29 @@ export async function middleware(request) {
     return supabaseResponse
   }
 
-  // Protect dashboard and import routes
+  // Protect dashboard and import routes — preserve return path for post-login
   if (!user && (pathname.startsWith('/dashboard') || pathname.startsWith('/import'))) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    const returnPath = pathname + (request.nextUrl.search || '')
+    url.searchParams.set('next', returnPath)
     return NextResponse.redirect(url)
   }
 
-  // Redirect to dashboard if logged in and visiting login
+  // Redirect logged-in users away from login (honor ?next= when safe)
   if (user && pathname === '/login') {
+    const nextParam = searchParams.get('next')
+    const safeNext =
+      nextParam &&
+      nextParam.startsWith('/') &&
+      !nextParam.startsWith('//') &&
+      !nextParam.includes('://')
+    if (safeNext) {
+      return NextResponse.redirect(new URL(nextParam, request.url))
+    }
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = '/import'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

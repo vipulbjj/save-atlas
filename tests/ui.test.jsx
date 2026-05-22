@@ -145,7 +145,7 @@ describe('UI: Dashboard Sidebar and Content Panel (Dashboard)', () => {
 
     await waitFor(() => {
       expect(screen.getByText('vbajaj56@gmail.com')).toBeDefined();
-      expect(screen.getByText('Premium Member')).toBeDefined();
+      expect(screen.getByText('Free plan')).toBeDefined();
     });
   });
 });

@@ -7,6 +7,15 @@ import styles from "./login.module.css";
 
 import { createClient } from "@/lib/supabase-client";
 
+function getPostAuthPath() {
+  if (typeof window === "undefined") return "/import";
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (next && next.startsWith("/") && !next.startsWith("//") && !next.includes("://")) {
+    return next;
+  }
+  return "/import";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -35,7 +44,7 @@ export default function LoginPage() {
         if (error) throw error;
         
         if (data?.session) {
-          router.push("/dashboard");
+          router.push(getPostAuthPath());
         } else {
           setSignUpSuccess(true);
           setLoading(false);
@@ -46,7 +55,7 @@ export default function LoginPage() {
           password,
         });
         if (error) throw error;
-        router.push("/dashboard");
+        router.push(getPostAuthPath());
       }
     } catch (err) {
       setErrorMsg(err.message || "Failed to authenticate.");
@@ -150,7 +159,7 @@ export default function LoginPage() {
               <p className={styles.signupText}>
                 {isSignUp ? "Already have an account? " : "Don't have an account? "}
                 <a href="#" onClick={(e) => { e.preventDefault(); setIsSignUp(!isSignUp); setErrorMsg(""); }}>
-                  {isSignUp ? "Sign In" : "Request Access"}
+                  {isSignUp ? "Sign In" : "Create free account"}
                 </a>
               </p>
             </>

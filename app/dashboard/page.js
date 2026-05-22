@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { 
   Search, Grid as GridIcon, List, SortAsc, RefreshCw, ChevronDown, 
   Settings, Bell, Layers, ExternalLink, Heart, Clock, X, Image, Film, 
-  ArrowUpRight, Sparkles, Lightbulb, Loader2, UploadCloud, LogOut
+  ArrowUpRight, Sparkles, Lightbulb, Loader2, UploadCloud, LogOut, Menu
 } from "lucide-react";
 import styles from "./dashboard.module.css";
 import { createClient } from "@/lib/supabase-client";
@@ -168,6 +168,8 @@ export default function Dashboard() {
   const [globalStats, setGlobalStats] = useState({ total: 0, photos: 0, videos: 0, categories: {}, subCategories: {} });
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [importBanner, setImportBanner] = useState(null);
 
   const searchRef = useRef(null);
   const sortRef = useRef(null);
@@ -179,6 +181,19 @@ export default function Dashboard() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const imported = params.get("imported");
+    if (imported) {
+      setImportBanner(`Imported ${imported} saves — try search: villa, startup, travel`);
+      params.delete("imported");
+      const qs = params.toString();
+      const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+      window.history.replaceState({}, "", next);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -372,7 +387,15 @@ export default function Dashboard() {
 
   return (
     <div className={styles.layout}>
-      <aside className={styles.sidebar}>
+      {sidebarOpen && (
+        <button
+          type="button"
+          className={styles.sidebarOverlay}
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}>
         <div className={styles.sidebarTop}>
           <a href="/" className={styles.logo}>
             <span className={styles.logoMark}>SA</span>
@@ -391,7 +414,7 @@ export default function Dashboard() {
                 <button
                   key={cat.id}
                   className={`${styles.navItem} ${activeCategory === cat.id && activeCollection === 'all' ? styles.navActive : ""}`}
-                  onClick={() => { setActiveCategory(cat.id); setActiveCollection('all'); setActiveSubCategory('all'); }}
+                  onClick={() => { setActiveCategory(cat.id); setActiveCollection('all'); setActiveSubCategory('all'); setSidebarOpen(false); }}
                 >
                   <span className={styles.navIcon}>{cat.icon}</span>
                   <span>{cat.label}</span>
@@ -415,7 +438,7 @@ export default function Dashboard() {
                 <button 
                   key={item.id} 
                   className={`${styles.navItem} ${activeCollection === item.id ? styles.navActive : ""}`}
-                  onClick={() => { setActiveCollection(item.id); setActiveCategory('all'); setActiveSubCategory('all'); }}
+                  onClick={() => { setActiveCollection(item.id); setActiveCategory('all'); setActiveSubCategory('all'); setSidebarOpen(false); }}
                 >
                   <span className={styles.navIcon}>{item.icon}</span>
                   <span>{item.label}</span>
@@ -432,7 +455,7 @@ export default function Dashboard() {
             </div>
             <div className={styles.userInfo}>
               <span className={styles.userEmail}>{userEmail || "explorer@saveatlas.com"}</span>
-              <span className={styles.userBadge}>Premium Member</span>
+              <span className={styles.userBadge}>Free plan</span>
             </div>
             <button className={styles.logoutBtn} onClick={handleLogout} title="Logout">
               <LogOut size={16} />
@@ -448,6 +471,14 @@ export default function Dashboard() {
 
       <main className={styles.main}>
         <header className={styles.header}>
+          <button
+            type="button"
+            className={styles.menuBtn}
+            aria-label="Open navigation"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu size={22} />
+          </button>
           <div className={`${styles.searchBar} ${searchQuery ? styles.searchBarActive : ""}`}>
             <div className={styles.aiGlow}></div>
             <Search className={styles.searchIcon} size={18} />
@@ -471,11 +502,20 @@ export default function Dashboard() {
         </header>
 
         <div className={styles.content}>
+          {importBanner && (
+            <div className={styles.importBanner} role="status">
+              <Sparkles size={16} />
+              <span>{importBanner}</span>
+              <button type="button" className={styles.importBannerDismiss} onClick={() => setImportBanner(null)} aria-label="Dismiss">
+                <X size={14} />
+              </button>
+            </div>
+          )}
           <div className={styles.welcome}>
             <div>
               <h1 className={styles.title}>Knowledge Library</h1>
               <p className={styles.subtitle}>
-                Exploring {globalStats.total || 0} curated architectural & tech insights
+                {globalStats.total || 0} Instagram saves — search across travel, startups, design, and more
               </p>
             </div>
             <div className={styles.stats}>
@@ -588,7 +628,7 @@ export default function Dashboard() {
                     <div className={styles.cardThumb}>
                       <img
                         src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=640&h=640&fit=cover`}
-                        alt=""
+                        alt={save.caption ? fixEncoding(save.caption).slice(0, 80) : `Instagram save by @${save.username || "user"}`}
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={(e) => { 
