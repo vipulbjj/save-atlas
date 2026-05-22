@@ -108,7 +108,7 @@ export default function LoginPage() {
 
               <form onSubmit={handleAuth} className={styles.form}>
                 {errorMsg && (
-                  <div style={{ color: '#ff6b6b', background: 'rgba(255,107,107,0.1)', padding: '12px', borderRadius: '8px', fontSize: '0.9rem', marginBottom: '16px' }}>
+                  <div role="alert" style={{ color: '#ff6b6b', background: 'rgba(255,107,107,0.1)', padding: '12px', borderRadius: '8px', fontSize: '0.9rem', marginBottom: '16px' }}>
                     {errorMsg}
                   </div>
                 )}
@@ -130,7 +130,7 @@ export default function LoginPage() {
                 <div className={styles.inputGroup}>
                   <div className={styles.passwordHeader}>
                     <label htmlFor="password">Password</label>
-                    <a href="#" className={styles.forgotLink}>Forgot?</a>
+                    <a href="/auth/forgot" className={styles.forgotLink}>Forgot?</a>
                   </div>
                   <div className={styles.inputWrapper}>
                     <Lock size={18} className={styles.inputIcon} />
