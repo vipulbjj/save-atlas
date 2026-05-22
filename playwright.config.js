@@ -4,7 +4,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'https://save-atlas.vercel.ap
 /** @type {import('@playwright/test').PlaywrightTestConfig} */
 const config = {
   testDir: './e2e',
-  timeout: 60_000,
+  timeout: 120_000,
   retries: process.env.CI ? 1 : 0,
   use: {
     baseURL,

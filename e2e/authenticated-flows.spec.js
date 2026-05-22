@@ -12,14 +12,16 @@ async function signIn(page) {
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.getByRole('button', { name: /^sign in$/i }).click();
-  const error = page.getByRole('alert');
-  await Promise.race([
-    page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 45_000 }),
-    error.waitFor({ state: 'visible', timeout: 45_000 }).then(async () => {
-      const msg = await error.textContent();
-      throw new Error(`Login failed: ${msg || 'unknown error'}`);
-    }),
-  ]);
+
+  try {
+    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 45_000 });
+  } catch {
+    const err = page.locator('[role="alert"]');
+    if (await err.isVisible()) {
+      throw new Error(`Login failed: ${(await err.textContent())?.trim() || 'see screenshot'}`);
+    }
+    throw new Error('Login did not leave /login — check credentials or Supabase env on the target URL');
+  }
 }
 
 test.describe('SaveAtlas authenticated flows', () => {
@@ -30,7 +32,7 @@ test.describe('SaveAtlas authenticated flows', () => {
   test('sign in lands on import page', async ({ page }) => {
     await signIn(page);
     await expect(page).toHaveURL(/\/import/);
-    await expect(page.getByText(/upload your instagram export/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /import your instagram saves/i })).toBeVisible();
   });
 
   test('dashboard loads search and sidebar for real user', async ({ page }) => {
