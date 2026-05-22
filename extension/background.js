@@ -118,24 +118,31 @@ async function flushBatch() {
   updateStatus({ state: 'syncing', message: `Syncing ${newPosts.length} new saves...` });
 
   try {
-    const { saveatlas_user_token: token } = await chrome.storage.local.get('saveatlas_user_token');
-
     const response = await fetch(SAVEATLAS_API, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ saves: newPosts }),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`API error ${response.status}: ${errText}`);
+    const result = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      updateStatus({
+        state: 'error',
+        message: 'Log in at save-atlas.vercel.app, then sync again.',
+      });
+      chrome.tabs.create({ url: 'https://save-atlas.vercel.app/login?next=%2Fdashboard' });
+      return;
     }
 
-    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || `API error ${response.status}`);
+    }
+
     console.log('[SaveAtlas BG] Sync successful:', result);
+
+    const imported = result.imported ?? newPosts.length;
 
     // Mark synced IDs in local storage
     const newSyncedIds = [...syncedIds, ...newPosts.map((p) => p.instagram_id)];
@@ -144,21 +151,24 @@ async function flushBatch() {
     await chrome.storage.local.set({
       saveatlas_synced_ids: newSyncedIds,
       saveatlas_last_sync: new Date().toISOString(),
-      saveatlas_total: currentTotal + newPosts.length,
+      saveatlas_total: currentTotal + imported,
     });
 
     updateStatus({
       state: 'success',
-      message: `Synced ${newPosts.length} saves. Total: ${currentTotal + newPosts.length}`,
+      message:
+        imported === 0
+          ? `No new saves (${result.skipped ?? 0} already in library).`
+          : `Synced ${imported} saves. Total: ${currentTotal + imported}`,
     });
 
     // Show notification for significant syncs
-    if (newPosts.length >= 5) {
+    if (imported >= 5) {
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icons/icon-48.png',
         title: 'SaveAtlas Synced',
-        message: `${newPosts.length} new saves added to your library.`,
+        message: `${imported} new saves added to your library.`,
       });
     }
   } catch (err) {
