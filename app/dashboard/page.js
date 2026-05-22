@@ -41,6 +41,11 @@ const formatDate = (ts) => {
   });
 };
 
+const saveImageAlt = (save) =>
+  save.caption
+    ? fixEncoding(save.caption).slice(0, 80)
+    : `Instagram save by @${save.username || "user"}`;
+
 const Highlight = ({ text, query }) => {
   if (!query) return <span>{text}</span>;
   const parts = text.split(new RegExp(`(${query})`, 'gi'));
@@ -628,7 +633,7 @@ export default function Dashboard() {
                     <div className={styles.cardThumb}>
                       <img
                         src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=640&h=640&fit=cover`}
-                        alt={save.caption ? fixEncoding(save.caption).slice(0, 80) : `Instagram save by @${save.username || "user"}`}
+                        alt={saveImageAlt(save)}
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={(e) => { 
@@ -667,7 +672,7 @@ export default function Dashboard() {
                   <div className={styles.listThumb}>
                     <img 
                       src={save.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${save.instagram_id}/media/?size=l&w=200&h=200&fit=cover`} 
-                      alt="" 
+                      alt={saveImageAlt(save)}
                       referrerPolicy="no-referrer"
                       loading="lazy" 
                     />
@@ -698,7 +703,7 @@ export default function Dashboard() {
             <div className={styles.modalLeft}>
               <img
                 src={selectedSave.thumbnail_url || `https://images.weserv.nl/?url=https://www.instagram.com/p/${selectedSave.instagram_id}/media/?size=l&w=1080&h=1080&fit=cover`}
-                alt=""
+                alt={saveImageAlt(selectedSave)}
                 referrerPolicy="no-referrer"
               />
             </div>
