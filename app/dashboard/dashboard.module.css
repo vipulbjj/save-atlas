@@ -412,6 +412,95 @@
   border-color: white;
 }
 
+/* Auto Organize button */
+.organizeBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.organizeBtn:hover:not(:disabled) {
+  background: rgba(176, 141, 106, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.organizeBtnActive {
+  background: rgba(176, 141, 106, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.organizeBtn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Sync guidance card (shown on empty library) */
+.syncCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 32px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  text-align: left;
+  max-width: 480px;
+}
+
+.syncCardIcon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(176, 141, 106, 0.12);
+  border: 1px solid rgba(176, 141, 106, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.syncCardBody strong {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.syncCardBody p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.syncCardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.syncCardLink:hover { opacity: 0.75; }
+
 .subBadge {
   font-size: 0.7rem;
   background: rgba(255, 255, 255, 0.1);

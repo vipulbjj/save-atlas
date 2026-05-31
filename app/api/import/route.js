@@ -9,6 +9,8 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { inferFullTaxonomy } from '@/lib/categorize';
+import { buildSearchText } from '@/lib/searchText';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -32,16 +34,6 @@ function fixEncoding(str) {
   } catch (e) {
     return str.replace(/\0/g, '');
   }
-}
-
-function inferCategory(caption, hashtags) {
-  const text = `${caption || ''} ${(hashtags || []).join(' ')}`.toLowerCase();
-  if (text.match(/ai|claude|gpt|ai|code|python|repo|efficient|logic|tech/)) return 'tech-ai';
-  if (text.match(/startup|yc|founder|marketing|brand|budget|startup|founder|yc|paul graham/)) return 'business';
-  if (text.match(/love|relationship|maa|life|secrets|perspective|child|family|mindset|growth/)) return 'lifestyle';
-  if (text.match(/travel|trip|road trip|vacation|staycation|stay|dividends|eiffel|visit/)) return 'travel';
-  if (text.match(/home|interior|living|bedroom|kitchen|sofa|furniture|decor|room|villa|facade|architect/)) return 'home-design';
-  return 'other';
 }
 
 export async function POST(request) {
@@ -73,7 +65,7 @@ export async function POST(request) {
       const rawCaption = save.caption || save.title || '';
       const fixedCaption = fixEncoding(rawCaption).replace(/\0/g, '');
       const hashtags = extractHashtags(fixedCaption);
-      const category = inferCategory(fixedCaption, hashtags);
+      const { category, subCategory } = inferFullTaxonomy(fixedCaption, hashtags);
 
       // Validate & sanitize media type to prevent database check constraint failure
       let mediaType = 'IMAGE';
@@ -98,6 +90,7 @@ export async function POST(request) {
         instagram_id: save.shortcode,
         username: null,
         caption: fixedCaption || null,
+        search_text: buildSearchText({ caption: fixedCaption, hashtags }),
         media_type: mediaType,
         thumbnail_url: null,
         video_url: null,
@@ -106,8 +99,9 @@ export async function POST(request) {
         location: null,
         permalink: save.permalink,
         timestamp: toISO(save.timestamp),
-        ai_processed: true, // Mark as processed since we did the inference
+        ai_processed: true,
         ai_category: category,
+        ai_subcategory: subCategory,
       };
     });
 

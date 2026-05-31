@@ -21,7 +21,8 @@ vi.mock('@/lib/supabase-server', () => ({
 // Import the API routes and functions after the mock has been registered
 import { GET as getStats } from '@/app/api/stats/route';
 import { POST as updateSave } from '@/app/api/saves/update/route';
-import { expandQuery } from '@/lib/aiSearch';
+import { parseSearchTerms, captionMatchesSearch, rankSearchResults } from '@/lib/aiSearch';
+import { buildSearchText } from '@/lib/searchText';
 
 // Helper test for Instagram UTF-8 moji-bake encoding correction
 const fixEncoding = (str) => {
@@ -48,27 +49,49 @@ describe('Backend Utility Tests', () => {
   });
 });
 
-describe('AI Search Expansion Tests', () => {
-  it('should correctly expand synonyms when query matches a value', () => {
-    const query = "villa";
-    const expanded = expandQuery(query);
-    expect(expanded).toContain("luxury");
-    expect(expanded).toContain("premium");
-    expect(expanded).toContain("mansion");
-    expect(expanded).toContain("villa");
+describe('Search query parsing', () => {
+  it('requires every term to match caption (AND, not OR)', () => {
+    expect(captionMatchesSearch('Modern bathroom design ideas', 'bathroom designs')).toBe(true);
+    expect(captionMatchesSearch('Small changes that transform a space', 'bathroom designs')).toBe(false);
+    expect(captionMatchesSearch('6 Steps to Build with AI', 'bathroom designs')).toBe(false);
   });
 
-  it('should correctly expand synonyms when query matches a high-level key', () => {
-    const query = "modern";
-    const expanded = expandQuery(query);
-    expect(expanded).toContain("modern");
-    expect(expanded).toContain("minimalist");
-    expect(expanded).toContain("sleek");
+  it('handles simple plural stems', () => {
+    expect(captionMatchesSearch('Beautiful bathroom design', 'bathroom designs')).toBe(true);
   });
 
-  it('should handle empty or null query gracefully', () => {
-    expect(expandQuery("")).toBe("");
-    expect(expandQuery(null)).toBe("");
+  it('parses terms and ignores stop words', () => {
+    expect(parseSearchTerms('bathroom designs')).toEqual(['bathroom', 'designs']);
+    expect(parseSearchTerms('')).toEqual([]);
+    expect(parseSearchTerms(null)).toEqual([]);
+  });
+
+  it('ranks exact phrase matches higher', () => {
+    const saves = [
+      { id: '1', caption: 'Love this bathroom design' },
+      { id: '2', caption: 'bathroom designs for small spaces' },
+    ];
+    const ranked = rankSearchResults(saves, 'bathroom designs');
+    expect(ranked[0].id).toBe('2');
+  });
+});
+
+describe('Search text for embeddings', () => {
+  it('combines caption and hashtags without hash symbols', () => {
+    const text = buildSearchText({
+      caption: 'Love this #bathroom setup',
+      hashtags: ['interiordesign', 'homedecor'],
+      username: 'designer',
+    });
+    expect(text).toContain('bathroom setup');
+    expect(text).toContain('interiordesign');
+    expect(text).toContain('@designer');
+    expect(text).not.toContain('#');
+  });
+
+  it('returns empty for missing content', () => {
+    expect(buildSearchText({})).toBe('');
+    expect(buildSearchText({ caption: '   ' })).toBe('');
   });
 });
 

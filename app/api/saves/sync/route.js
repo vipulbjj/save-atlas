@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { inferFullTaxonomy } from '@/lib/categorize';
+import { buildSearchText } from '@/lib/searchText';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,16 +27,6 @@ function extractHashtags(text) {
   return matches ? [...new Set(matches.map((h) => h.toLowerCase()))] : [];
 }
 
-function inferCategory(caption, hashtags) {
-  const text = `${caption || ''} ${(hashtags || []).join(' ')}`.toLowerCase();
-  if (text.match(/ai|claude|gpt|code|python|repo|tech/)) return 'tech-ai';
-  if (text.match(/startup|yc|founder|marketing|brand|business/)) return 'business';
-  if (text.match(/love|relationship|life|family|mindset|growth/)) return 'lifestyle';
-  if (text.match(/travel|trip|vacation|visit/)) return 'travel';
-  if (text.match(/home|interior|living|furniture|decor|architect/)) return 'home-design';
-  return 'other';
-}
-
 function extensionSaveToRecord(save, userId) {
   const rawCaption = save.caption || save.title || '';
   const fixedCaption = fixEncoding(rawCaption).replace(/\0/g, '');
@@ -42,7 +34,7 @@ function extensionSaveToRecord(save, userId) {
     Array.isArray(save.hashtags) && save.hashtags.length > 0
       ? save.hashtags.map((h) => fixEncoding(h))
       : extractHashtags(fixedCaption);
-  const category = inferCategory(fixedCaption, hashtags);
+  const { category, subCategory } = inferFullTaxonomy(fixedCaption, hashtags);
 
   let mediaType = 'IMAGE';
   if (save.media_type && ['IMAGE', 'VIDEO', 'CAROUSEL'].includes(save.media_type)) {
@@ -59,6 +51,7 @@ function extensionSaveToRecord(save, userId) {
     instagram_id: String(instagramId),
     username: save.username || null,
     caption: fixedCaption || null,
+    search_text: buildSearchText({ caption: fixedCaption, hashtags, username: save.username }),
     media_type: mediaType,
     thumbnail_url: save.thumbnail_url || null,
     video_url: save.video_url || null,
@@ -69,6 +62,7 @@ function extensionSaveToRecord(save, userId) {
     timestamp: save.timestamp || new Date().toISOString(),
     ai_processed: true,
     ai_category: category,
+    ai_subcategory: subCategory,
   };
 }
 
@@ -140,14 +134,16 @@ async function backfillUnprocessed(supabase, userId) {
       try {
         const fixedCaption = fixEncoding(save.caption);
         const hashtags = (save.hashtags || []).map((h) => fixEncoding(h));
-        const category = inferCategory(fixedCaption, hashtags);
+        const { category, subCategory } = inferFullTaxonomy(fixedCaption, hashtags);
 
         const { error: updateError } = await supabase
           .from('saves')
           .update({
             caption: fixedCaption,
             hashtags,
+            search_text: buildSearchText({ caption: fixedCaption, hashtags, username: save.username }),
             ai_category: category,
+            ai_subcategory: subCategory,
             ai_processed: true,
           })
           .eq('id', save.id);

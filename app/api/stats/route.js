@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { CATEGORIES, SUBCATEGORIES } from '@/lib/categorize';
 
 export const dynamic = 'force-dynamic';
 
-const CATEGORIES_LIST = ["tech-ai", "business", "lifestyle", "travel", "home-design", "other"];
-
-const SUBCATEGORIES_MAP = {
-  "tech-ai": ["ai-tools", "coding", "productivity", "future"],
-  "business": ["founders", "marketing", "finance", "strategy"],
-  "lifestyle": ["mindset", "family", "wellness", "personal-finance"],
-  "travel": ["destinations", "stays", "tips", "nature"],
-  "home-design": ["architecture", "interiors", "decor", "lighting"]
-};
+// Build flat lists from taxonomy for the large-account query path
+const CATEGORIES_LIST = CATEGORIES.map((c) => c.id);
+const SUBCATEGORIES_MAP = Object.fromEntries(
+  Object.entries(SUBCATEGORIES).map(([cat, subs]) => [cat, subs.map((s) => s.id)])
+);
 
 export async function GET() {
   try {

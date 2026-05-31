@@ -1,27 +1,26 @@
 /**
  * GET /api/saves
- * 
- * Returns the user's saves with optional filtering:
- *   ?category=Facades
- *   ?search=stone staircase
- *   ?page=1&limit=50
+ *
+ * Returns the user's saves with optional filtering.
+ * Search uses semantic similarity over indexed post text when OPENAI_API_KEY
+ * and caption_embedding are available; otherwise strict caption keyword match.
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { expandQuery } from '@/lib/aiSearch';
+import { searchUserSaves } from '@/lib/semanticSearch';
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
-    const search   = searchParams.get('search');
+    const search = searchParams.get('search');
     const subcategory = searchParams.get('subcategory');
     const mediaType = searchParams.get('media_type');
     const collection = searchParams.get('collection');
-    const page     = parseInt(searchParams.get('page') || '1', 10);
-    const limit    = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
-    const offset   = (page - 1) * limit;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
+    const offset = (page - 1) * limit;
 
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -32,59 +31,22 @@ export async function GET(request) {
 
     const userId = user.id;
 
-    let query = supabase
-      .from('saves')
-      .select('*', { count: 'exact' })
-      .eq('user_id', userId)
-      .order('timestamp', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const { saves, total, mode } = await searchUserSaves(supabase, userId, {
+      search,
+      category,
+      subcategory,
+      mediaType,
+      collection,
+      limit,
+      offset,
+    });
 
-    if (category && category !== 'all') {
-      query = query.eq('ai_category', category);
-    }
-
-    if (subcategory && subcategory !== 'all') {
-      query = query.eq('ai_subcategory', subcategory);
-    }
-
-    if (mediaType && mediaType !== 'all') {
-      query = query.eq('media_type', mediaType);
-    }
-
-    if (collection && collection !== 'all') {
-      if (collection === 'favourites') {
-        query = query.gt('likes', 0);
-      } else if (collection === 'inspiration') {
-        query = query.in('ai_category', ['home-design', 'tech-ai']);
-      } else if (collection === 'highlights') {
-        query = query.or('caption.ilike.%#highlight%,caption.ilike.%excellent%,caption.ilike.%best%');
-      }
-    }
-
-    if (search) {
-      const expanded = expandQuery(search);
-      // We use 'plain' or 'websearch' for the primary term, 
-      // but 'tsquery' style for the expansion if we want absolute matching.
-      // For a better 'AI' feel, we'll just stick to websearch but pass more context.
-      query = query.textSearch('caption', expanded, { 
-        type: 'websearch', 
-        config: 'english' 
-      });
-    }
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    }
-
-    // Get counts for photos and videos
     const { count: photoCount } = await supabase
       .from('saves')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('media_type', 'IMAGE');
-    
+
     const { count: videoCount } = await supabase
       .from('saves')
       .select('id', { count: 'exact', head: true })
@@ -92,16 +54,17 @@ export async function GET(request) {
       .eq('media_type', 'VIDEO');
 
     return NextResponse.json({
-      ok:    true,
-      saves: data,
-      total: count,
+      ok: true,
+      saves,
+      total,
+      searchMode: mode,
       photos: photoCount || 0,
       videos: videoCount || 0,
       page,
       limit,
     });
-
   } catch (err) {
+    console.error('Saves GET error:', err);
     return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });
   }
 }
