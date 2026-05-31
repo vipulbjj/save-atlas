@@ -141,6 +141,34 @@
   border-radius: 6px;
 }
 
+.navSubItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 28px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 0.82rem;
+  font-weight: 500;
+  margin-bottom: 2px;
+  text-align: left;
+}
+
+.navSubItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: white;
+}
+
+.navSubActive {
+  background: rgba(176, 141, 106, 0.08);
+  color: var(--accent);
+}
+
 .sidebarBottom {
   padding-top: 24px;
   border-top: 1px solid var(--border-color);

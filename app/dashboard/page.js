@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import styles from "./dashboard.module.css";
 import { createClient } from "@/lib/supabase-client";
-import { CATEGORIES as TAXONOMY_CATEGORIES } from "@/lib/categorize";
+import { CATEGORIES as TAXONOMY_CATEGORIES, SUBCATEGORIES } from "@/lib/categorize";
 import { captionMatchesSearch } from "@/lib/aiSearch";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -347,7 +347,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeCategory === "all") { setTopics([]); setActiveTheme(null); return; }
     let cancelled = false;
-    fetch(`/api/saves/topics?category=${activeCategory}&limit=16`)
+    fetch(`/api/saves/topics?category=${activeCategory}&limit=10`)
       .then((r) => r.json())
       .then((d) => { if (!cancelled && d.ok) setTopics(d.topics || []); })
       .catch(() => {});
@@ -364,6 +364,20 @@ export default function Dashboard() {
     ...ALL_CAT.slice(1).filter((c) => (globalStats.categories[c.id] ?? 0) > 0)
       .sort((a, b) => (globalStats.categories[b.id] ?? 0) - (globalStats.categories[a.id] ?? 0)),
   ];
+
+  const activeCategoryLabel = ALL_CAT.find((c) => c.id === activeCategory)?.label;
+
+  const sidebarSubcategories = activeCategory !== "all"
+    ? Object.entries(globalStats.subCategories?.[activeCategory] || {})
+        .filter(([id, count]) => id && id !== "other" && count >= 3)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id, count]) => ({
+          id,
+          count,
+          label: SUBCATEGORIES[activeCategory]?.find((s) => s.id === id)?.label
+            || id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        }))
+    : [];
 
   // Dynamic subtitle: list user's top categories by name
   const topCatNames = Object.entries(globalStats.categories)
@@ -475,6 +489,37 @@ export default function Dashboard() {
                 </button>
               ))}
             </div>
+
+            {activeCategory !== "all" && sidebarSubcategories.length > 0 && (
+              <div className={styles.navSection}>
+                <span className={styles.navLabel}>In {activeCategoryLabel}</span>
+                <button
+                  className={`${styles.navSubItem} ${activeSubCategory === "all" && !activeTheme ? styles.navSubActive : ""}`}
+                  onClick={() => {
+                    setActiveSubCategory("all");
+                    setActiveTheme(null);
+                    setSidebarOpen(false);
+                  }}
+                >
+                  <span>All in category</span>
+                </button>
+                {sidebarSubcategories.map((sub) => (
+                  <button
+                    key={sub.id}
+                    className={`${styles.navSubItem} ${activeSubCategory === sub.id && !activeTheme ? styles.navSubActive : ""}`}
+                    onClick={() => {
+                      setActiveSubCategory(sub.id);
+                      setActiveTheme(null);
+                      setSearchQuery("");
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    <span>{sub.label}</span>
+                    <span className={styles.navBadge}>{sub.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className={styles.navSection}>
               <span className={styles.navLabel}>Collections</span>
@@ -622,23 +667,36 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Subcategory pills — themes mined from post text in this category */}
+          {/* Filter pills — subcategories + distinct caption themes */}
           {activeCategory !== "all" && topics.length > 0 && (
             <div className={styles.subToolbar}>
               <button
-                className={`${styles.subTab} ${!activeTheme ? styles.subTabActive : ""}`}
-                onClick={() => setActiveTheme(null)}
+                className={`${styles.subTab} ${!activeTheme && activeSubCategory === "all" ? styles.subTabActive : ""}`}
+                onClick={() => {
+                  setActiveTheme(null);
+                  setActiveSubCategory("all");
+                }}
               >
-                All {ALL_CAT.find((c) => c.id === activeCategory)?.label}
+                All {activeCategoryLabel}
               </button>
               {topics.map((theme) => (
                 <button
                   key={theme.id}
-                  className={`${styles.subTab} ${activeTheme?.query === theme.query ? styles.subTabActive : ""}`}
+                  className={`${styles.subTab} ${
+                    (theme.kind === "subcategory" && activeSubCategory === theme.subcategoryId && !activeTheme)
+                    || (theme.kind === "theme" && activeTheme?.query === theme.query)
+                      ? styles.subTabActive
+                      : ""
+                  }`}
                   onClick={() => {
-                    setActiveTheme({ label: theme.label, query: theme.query });
                     setSearchQuery("");
-                    setActiveSubCategory("all");
+                    if (theme.kind === "subcategory") {
+                      setActiveSubCategory(theme.subcategoryId);
+                      setActiveTheme(null);
+                    } else {
+                      setActiveSubCategory("all");
+                      setActiveTheme({ label: theme.label, query: theme.query });
+                    }
                   }}
                 >
                   {theme.label}

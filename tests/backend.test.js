@@ -23,6 +23,7 @@ import { GET as getStats } from '@/app/api/stats/route';
 import { POST as updateSave } from '@/app/api/saves/update/route';
 import { parseSearchTerms, captionMatchesSearch, rankSearchResults } from '@/lib/aiSearch';
 import { buildSearchText } from '@/lib/searchText';
+import { buildCategoryFilters } from '@/lib/extractTopics';
 
 // Helper test for Instagram UTF-8 moji-bake encoding correction
 const fixEncoding = (str) => {
@@ -92,6 +93,25 @@ describe('Search text for embeddings', () => {
   it('returns empty for missing content', () => {
     expect(buildSearchText({})).toBe('');
     expect(buildSearchText({ caption: '   ' })).toBe('');
+  });
+});
+
+describe('Category filter pills', () => {
+  it('prefers subcategories and drops redundant hashtag pairs', () => {
+    const rows = [
+      { caption: 'Stunning #interiordesign for this #homedecor #homedesign living room', ai_subcategory: 'interiors' },
+      { caption: 'Another #interiordesign #homedecor post about the kitchen', ai_subcategory: 'interiors' },
+      { caption: 'Luxury #luxuryhomes with marble bathroom details', ai_subcategory: 'decor' },
+      { caption: 'Japandi bedroom makeover with warm wood tones', ai_subcategory: 'interiors' },
+      { caption: 'Modern villa facade and pool courtyard', ai_subcategory: 'architecture' },
+    ];
+    const subs = { interiors: 3, decor: 1, architecture: 1 };
+    const filters = buildCategoryFilters('home-design', subs, rows, 10);
+    const labels = filters.map((f) => f.label);
+
+    expect(labels).toContain('Interiors');
+    expect(labels.some((l) => /Homedecor Homedesign/i.test(l))).toBe(false);
+    expect(labels.filter((l) => /interior/i.test(l) && /design/i.test(l)).length).toBeLessThanOrEqual(1);
   });
 });
 

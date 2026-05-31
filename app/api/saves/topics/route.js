@@ -1,13 +1,13 @@
 /**
- * GET /api/saves/topics?category=tech-ai&limit=16
+ * GET /api/saves/topics?category=home-design&limit=10
  *
- * Returns recurring themes mined from the user's post text in a category.
- * Response: { ok: true, topics: [{ id, label, query, count }] }
+ * Distinct filter pills for a category: subcategory counts + caption themes.
+ * Response: { ok: true, topics: [{ id, kind, label, query, subcategoryId, count }] }
  */
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { extractTopicsFromSaves } from '@/lib/extractTopics';
+import { buildCategoryFilters } from '@/lib/extractTopics';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
-    const limit = Math.min(Number(searchParams.get('limit') || 16), 30);
+    const limit = Math.min(Number(searchParams.get('limit') || 10), 12);
 
     if (!category || category === 'all') {
       return NextResponse.json({ ok: true, topics: [] });
@@ -33,14 +33,21 @@ export async function GET(request) {
 
     const { data, error } = await supabase
       .from('saves')
-      .select('caption, hashtags')
+      .select('caption, hashtags, ai_subcategory')
       .eq('user_id', user.id)
       .eq('ai_category', category)
       .limit(1000);
 
     if (error) throw error;
 
-    const topics = extractTopicsFromSaves(data || [], limit);
+    const subCategoryCounts = {};
+    for (const row of data || []) {
+      const sub = row.ai_subcategory || 'other';
+      if (sub === 'other') continue;
+      subCategoryCounts[sub] = (subCategoryCounts[sub] || 0) + 1;
+    }
+
+    const topics = buildCategoryFilters(category, subCategoryCounts, data || [], limit);
 
     return NextResponse.json({ ok: true, topics });
   } catch (err) {
