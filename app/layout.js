@@ -14,6 +14,16 @@ const playfair = Playfair_Display({
 export const metadata = {
   title: "SaveAtlas | AI Instagram Saves Organizer",
   description: "Automatically sync, organize, search, and categorize your Instagram saved posts with AI.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/apple-icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: ["/favicon.ico"],
+  },
 };
 
 export default function RootLayout({ children }) {
