@@ -24,7 +24,7 @@ import { POST as updateSave } from '@/app/api/saves/update/route';
 import { parseSearchTerms, captionMatchesSearch, rankSearchResults } from '@/lib/aiSearch';
 import { buildSearchText } from '@/lib/searchText';
 import { buildCategoryFilters } from '@/lib/extractTopics';
-import { parseSavedCollectionsFromExport } from '@/lib/parseInstagramCollections';
+import { parseSavedCollectionsFromExport, isValidFolderName } from '@/lib/parseInstagramCollections';
 
 // Helper test for Instagram UTF-8 moji-bake encoding correction
 const fixEncoding = (str) => {
@@ -161,6 +161,33 @@ describe('Instagram collection parser', () => {
     const map = parseSavedCollectionsFromExport(raw);
     expect(map.AbCdEf1).toEqual(['Travel']);
     expect(map.ReEl234).toEqual(['Food']);
+  });
+
+  it('rejects generic folder names like Media', () => {
+    const raw = {
+      saved_saved_collections: [
+        { title: 'Media', string_list_data: [{ href: 'https://www.instagram.com/p/AbC123/' }] },
+        { string_map_data: { Name: { value: 'Media' } } },
+        { string_map_data: { Name: { href: 'https://www.instagram.com/p/XyZ999/', value: 'Post' } } },
+      ],
+    };
+    const map = parseSavedCollectionsFromExport(raw);
+    expect(map.AbC123).toBeUndefined();
+    expect(map.XyZ999).toBeUndefined();
+    expect(isValidFolderName('Media')).toBe(false);
+    expect(isValidFolderName('Villa Ideas')).toBe(true);
+  });
+
+  it('parses collections embedded in saved_posts export shape', () => {
+    const raw = {
+      saved_saved_media: [],
+      saved_saved_collections: [
+        { string_map_data: { Name: { value: 'Startup Ideas' } } },
+        { string_map_data: { Name: { href: 'https://www.instagram.com/p/Embed1/', value: 'x' } } },
+      ],
+    };
+    const map = parseSavedCollectionsFromExport(raw);
+    expect(map.Embed1).toEqual(['Startup Ideas']);
   });
 });
 

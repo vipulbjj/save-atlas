@@ -99,6 +99,22 @@
   padding: 0 12px;
 }
 
+.sidebarHint {
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebarHint strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 .navItem {
   width: 100%;
   display: flex;

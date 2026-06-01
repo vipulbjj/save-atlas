@@ -532,6 +532,12 @@ export default function Dashboard() {
                   </button>
                 ))
               )}
+
+              {!hasIgFolders && globalStats.total > 0 && (
+                <p className={styles.sidebarHint}>
+                  Sidebar shows AI categories until Instagram folder names are imported. Re-upload your export with <strong>Saved posts and collections</strong> checked.
+                </p>
+              )}
             </div>
 
             {hasIgFolders && visibleCategories.filter((c) => c.id !== "all").length > 0 && (

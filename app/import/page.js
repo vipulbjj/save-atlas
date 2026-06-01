@@ -7,7 +7,7 @@ import {
   parseCollectionsFromText,
   mergeCollectionMaps,
   countCollectionEntries,
-  distinctFolderNames,
+  isCollectionsJsonPath,
 } from "@/lib/parseInstagramCollections";
 import { Upload, FileJson, CheckCircle2, AlertCircle, Loader2, ArrowRight, ExternalLink, FolderOpen } from "lucide-react";
 import styles from "./import.module.css";
@@ -17,7 +17,7 @@ const STEPS = [
     number: "01",
     title: "Request your Instagram export",
     description:
-      'Instagram app or web: Settings → Accounts Center → Your information and permissions → Download your information → "Some of your information" → check Saved posts → JSON → Create files.',
+      'Instagram app or web: Settings → Accounts Center → Your information and permissions → Download your information → "Some of your information" → check **Saved posts and collections** (both) → JSON → Create files.',
     action: { label: "Open Instagram download page", href: "https://www.instagram.com/download/request/" },
   },
   {
@@ -35,31 +35,51 @@ const STEPS = [
 ];
 
 // ── Client-side ZIP parser ─────────────────────────────────────────────────
-async function parseCollectionsFromZip(zip, jsonEntries) {
+async function parseCollectionsFromZip(_zip, jsonEntries) {
   let merged = {};
-  for (const { path, entry } of jsonEntries) {
-    const lower = path.toLowerCase();
-    const looksLikeCollectionsFile =
-      lower.includes("saved_collection") || lower.includes("saved/collection");
 
+  const collectionFiles = jsonEntries.filter(({ path }) => isCollectionsJsonPath(path));
+  const savedPostsFiles = jsonEntries.filter(({ path }) =>
+    path.toLowerCase().includes("saved_posts"),
+  );
+
+  async function parseEntry(entry, path, { allowRegexFallback = false } = {}) {
     try {
       const text = await entry.async("string");
       const parsed = JSON.parse(text);
-
-      if (
+      const hasCollectionKey =
         parsed?.saved_saved_collections
         || parsed?.saved_collections
-        || parsed?.collections
-        || looksLikeCollectionsFile
-      ) {
+        || parsed?.collections;
+
+      if (hasCollectionKey || isCollectionsJsonPath(path)) {
         merged = mergeCollectionMaps(merged, parseSavedCollectionsFromExport(parsed));
       }
 
-      if (looksLikeCollectionsFile && countCollectionEntries(merged) === 0) {
+      if (allowRegexFallback && countCollectionEntries(merged) === 0) {
         merged = mergeCollectionMaps(merged, parseCollectionsFromText(text));
       }
     } catch { /* skip */ }
   }
+
+  // 1) Dedicated saved_collections.json (user-named folders live here)
+  for (const { path, entry } of collectionFiles) {
+    await parseEntry(entry, path, { allowRegexFallback: true });
+  }
+
+  // 2) Some exports embed saved_saved_collections inside saved_posts.json
+  for (const { path, entry } of savedPostsFiles) {
+    await parseEntry(entry, path);
+  }
+
+  // 3) Any other JSON that declares collection keys
+  if (countCollectionEntries(merged) === 0) {
+    for (const { path, entry } of jsonEntries) {
+      if (isCollectionsJsonPath(path) || path.toLowerCase().includes("saved_posts")) continue;
+      await parseEntry(entry, path);
+    }
+  }
+
   return merged;
 }
 
@@ -343,7 +363,11 @@ export default function ImportPage() {
       for (const s of saves) {
         for (const name of s.collections || []) folderNames.add(name);
       }
-      setParseStats({ savesWithFolders, foldersFound: folderNames.size });
+      setParseStats({
+        savesWithFolders,
+        foldersFound: folderNames.size,
+        folderNames: [...folderNames].sort((a, b) => a.localeCompare(b)),
+      });
 
       setProgress(35);
       setStatusLabel(
@@ -453,7 +477,8 @@ export default function ImportPage() {
               {result?.collectionsUpdated > 0 ? (
                 <p>
                   Linked <strong>{result.collectionsUpdated}</strong> saves to{" "}
-                  <strong>{result.foldersFound ?? parseStats?.foldersFound ?? 0}</strong> Instagram folders.
+                  <strong>{result.foldersFound ?? parseStats?.foldersFound ?? 0}</strong> Instagram folders
+                  {parseStats?.folderNames?.length ? `: ${parseStats.folderNames.slice(0, 6).join(", ")}${parseStats.folderNames.length > 6 ? "…" : ""}` : "."}
                 </p>
               ) : parseStats?.savesWithFolders > 0 ? (
                 <p className={styles.warnText}>
