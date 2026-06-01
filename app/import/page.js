@@ -2,6 +2,13 @@
 
 import { useState, useRef, useCallback } from "react";
 import JSZip from "jszip";
+import {
+  parseSavedCollectionsFromExport,
+  parseCollectionsFromText,
+  mergeCollectionMaps,
+  countCollectionEntries,
+  distinctFolderNames,
+} from "@/lib/parseInstagramCollections";
 import { Upload, FileJson, CheckCircle2, AlertCircle, Loader2, ArrowRight, ExternalLink, FolderOpen } from "lucide-react";
 import styles from "./import.module.css";
 
@@ -28,6 +35,42 @@ const STEPS = [
 ];
 
 // ── Client-side ZIP parser ─────────────────────────────────────────────────
+async function parseCollectionsFromZip(zip, jsonEntries) {
+  let merged = {};
+  for (const { path, entry } of jsonEntries) {
+    const lower = path.toLowerCase();
+    const looksLikeCollectionsFile =
+      lower.includes("saved_collection") || lower.includes("saved/collection");
+
+    try {
+      const text = await entry.async("string");
+      const parsed = JSON.parse(text);
+
+      if (
+        parsed?.saved_saved_collections
+        || parsed?.saved_collections
+        || parsed?.collections
+        || looksLikeCollectionsFile
+      ) {
+        merged = mergeCollectionMaps(merged, parseSavedCollectionsFromExport(parsed));
+      }
+
+      if (looksLikeCollectionsFile && countCollectionEntries(merged) === 0) {
+        merged = mergeCollectionMaps(merged, parseCollectionsFromText(text));
+      }
+    } catch { /* skip */ }
+  }
+  return merged;
+}
+
+function attachCollections(saves, collectionsByShortcode) {
+  if (!collectionsByShortcode || !Object.keys(collectionsByShortcode).length) return saves;
+  return saves.map((s) => ({
+    ...s,
+    collections: collectionsByShortcode[s.shortcode] || [],
+  }));
+}
+
 async function extractSavedPosts(file) {
   const name = file.name.toLowerCase();
 
@@ -54,6 +97,8 @@ async function extractSavedPosts(file) {
     // Pass 2: if nothing named saved_posts, try all JSON files
     const filesToTry = savedPostsFiles.length > 0 ? savedPostsFiles : jsonEntries;
 
+    const collectionsByShortcode = await parseCollectionsFromZip(zip, jsonEntries);
+
     const allSaves = [];
     const seenShortcodes = new Set();
 
@@ -71,7 +116,7 @@ async function extractSavedPosts(file) {
       } catch { /* skip unparseable files */ }
     }
 
-    if (allSaves.length > 0) return allSaves;
+    if (allSaves.length > 0) return attachCollections(allSaves, collectionsByShortcode);
 
     // Pass 3: brute-force regex across every JSON file in the ZIP
     for (const { entry } of jsonEntries) {
@@ -87,7 +132,7 @@ async function extractSavedPosts(file) {
       } catch { /* skip */ }
     }
 
-    if (allSaves.length > 0) return allSaves;
+    if (allSaves.length > 0) return attachCollections(allSaves, collectionsByShortcode);
 
     throw new Error(
       "Could not find any saved Instagram posts in this ZIP.\n\nMake sure you requested 'Saved posts' data in JSON format from Instagram. Try re-requesting the export and selecting only 'Saved posts and collections'."
@@ -120,17 +165,31 @@ function fixEncoding(str) {
   }
 }
 
+const IG_SHORTCODE_RE = /instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/;
+
+function shortcodeFromHref(href) {
+  if (!href) return null;
+  const m = href.match(IG_SHORTCODE_RE);
+  return m ? m[1] : null;
+}
+
+function permalinkForShortcode(shortcode, href) {
+  if (href?.includes("/reel/")) return `https://www.instagram.com/reel/${shortcode}/`;
+  if (href?.includes("/tv/")) return `https://www.instagram.com/tv/${shortcode}/`;
+  return `https://www.instagram.com/p/${shortcode}/`;
+}
+
 // ── Try every known Instagram JSON export structure ────────────────────────
 function tryParseFormat(raw, rawText) {
   const saves = [];
   const seen = new Set();
 
-  const add = (shortcode, timestamp, title) => {
+  const add = (shortcode, timestamp, title, href) => {
     if (!shortcode || seen.has(shortcode)) return;
     seen.add(shortcode);
     saves.push({
       shortcode,
-      permalink: `https://www.instagram.com/p/${shortcode}/`,
+      permalink: permalinkForShortcode(shortcode, href),
       timestamp: timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(),
       title: fixEncoding(title) || null,
     });
@@ -142,10 +201,8 @@ function tryParseFormat(raw, rawText) {
     const savedOn = entry?.string_map_data?.["Saved on"] || entry?.string_map_data?.["Saved On"];
     const href = savedOn?.href || entry?.href || null;
     const ts = savedOn?.timestamp || entry?.timestamp || null;
-    if (href) {
-      const m = href.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
-      if (m) add(m[1], ts, entry?.title);
-    }
+    const shortcode = shortcodeFromHref(href);
+    if (shortcode) add(shortcode, ts, entry?.title, href);
   }
   if (saves.length) return saves;
 
@@ -154,16 +211,14 @@ function tryParseFormat(raw, rawText) {
     for (const entry of raw) {
       const href = entry?.href || entry?.link || entry?.url || null;
       const ts = entry?.timestamp || entry?.saved_at || null;
-      if (href) {
-        const m = href.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
-        if (m) add(m[1], ts, entry?.title || entry?.caption);
-      }
+      const direct = shortcodeFromHref(href);
+      if (direct) add(direct, ts, entry?.title || entry?.caption, href);
       // Also check nested string_map_data
       const keys = entry?.string_map_data ? Object.values(entry.string_map_data) : [];
       for (const v of keys) {
         if (v?.href) {
-          const m = v.href.match(/instagram\.com\/p\/([A-Za-z0-9_-]+)/);
-          if (m) add(m[1], v.timestamp || ts, entry?.title);
+          const nested = shortcodeFromHref(v.href);
+          if (nested) add(nested, v.timestamp || ts, entry?.title, v.href);
         }
       }
     }
@@ -174,8 +229,8 @@ function tryParseFormat(raw, rawText) {
   const mediaItems = raw?.media || raw?.items || [];
   for (const item of mediaItems) {
     if (item?.uri) {
-      const m = item.uri.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
-      if (m) add(m[1], item.creation_timestamp || item.timestamp, item?.title);
+      const sc = shortcodeFromHref(item.uri);
+      if (sc) add(sc, item.creation_timestamp || item.timestamp, item?.title, item.uri);
     }
   }
   if (saves.length) return saves;
@@ -199,8 +254,8 @@ function tryParseFormat(raw, rawText) {
         }
       }
       if (href) {
-        const m = href.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
-        if (m) add(m[1], ts, caption || entry?.title);
+        const sc = shortcodeFromHref(href);
+        if (sc) add(sc, ts, caption || entry?.title, href);
       }
     }
   }
@@ -244,6 +299,7 @@ export default function ImportPage() {
   const [status, setStatus] = useState("idle"); // idle | parsing | uploading | success | error
   const [statusLabel, setStatusLabel] = useState("");
   const [result, setResult] = useState(null);
+  const [parseStats, setParseStats] = useState(null);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
@@ -259,6 +315,7 @@ export default function ImportPage() {
     setError(null);
     setStatus("idle");
     setResult(null);
+    setParseStats(null);
     setProgress(0);
   }, []);
 
@@ -281,8 +338,19 @@ export default function ImportPage() {
 
       const saves = await extractSavedPosts(file);
 
+      const savesWithFolders = saves.filter((s) => s.collections?.length).length;
+      const folderNames = new Set();
+      for (const s of saves) {
+        for (const name of s.collections || []) folderNames.add(name);
+      }
+      setParseStats({ savesWithFolders, foldersFound: folderNames.size });
+
       setProgress(35);
-      setStatusLabel(`Found ${saves.length} saved posts. Sending to your library…`);
+      setStatusLabel(
+        savesWithFolders > 0
+          ? `Found ${saves.length} posts in ${folderNames.size} Instagram folders. Syncing…`
+          : `Found ${saves.length} saved posts. Sending to your library…`,
+      );
 
       // Step 2 — Send only the small JSON array to the API (not the huge ZIP)
       setStatus("uploading");
@@ -320,6 +388,7 @@ export default function ImportPage() {
     setStatus("idle");
     setStatusLabel("");
     setResult(null);
+    setParseStats(null);
     setError(null);
     setProgress(0);
   };
@@ -369,12 +438,32 @@ export default function ImportPage() {
             <div className={styles.successState}>
               <CheckCircle2 size={56} className={styles.successIcon} />
               <h2>Import complete!</h2>
-              <p>
-                <strong>{result?.imported}</strong> saves added to your library
-                {result?.total > result?.imported
-                  ? ` — ${result.total - result.imported} were already there.`
-                  : "."}
-              </p>
+              {result?.imported > 0 ? (
+                <p>
+                  <strong>{result.imported}</strong> new saves added to your library
+                  {result.total > result.imported
+                    ? ` — ${result.total - result.imported} were already there.`
+                    : "."}
+                </p>
+              ) : (
+                <p>
+                  All <strong>{result?.total ?? 0}</strong> posts were already in your library.
+                </p>
+              )}
+              {result?.collectionsUpdated > 0 ? (
+                <p>
+                  Linked <strong>{result.collectionsUpdated}</strong> saves to{" "}
+                  <strong>{result.foldersFound ?? parseStats?.foldersFound ?? 0}</strong> Instagram folders.
+                </p>
+              ) : parseStats?.savesWithFolders > 0 ? (
+                <p className={styles.warnText}>
+                  Found {parseStats.savesWithFolders} posts with folder tags in your ZIP, but none were saved to the database. Try importing again after the latest app update.
+                </p>
+              ) : (
+                <p className={styles.warnText}>
+                  No Instagram collection folders found in this ZIP. When requesting your export, select <strong>Saved posts and collections</strong> (not posts only).
+                </p>
+              )}
               <div className={styles.successActions}>
                 <a
                   href={`/dashboard?imported=${encodeURIComponent(String(result?.imported ?? 0))}`}

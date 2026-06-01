@@ -102,6 +102,9 @@ export async function POST(request) {
         ai_processed: true,
         ai_category: category,
         ai_subcategory: subCategory,
+        ig_collections: Array.isArray(save.collections)
+          ? save.collections.filter(Boolean)
+          : [],
       };
     });
 
@@ -160,9 +163,43 @@ export async function POST(request) {
 
     const skipped = records.length - newRecords.length;
 
+    // Backfill Instagram folder names on existing saves when re-importing with collections
+    const withCollections = uniqueRecords.filter((r) => r.ig_collections?.length);
+    let collectionsUpdated = 0;
+    const UPDATE_CHUNK = 50;
+
+    for (let i = 0; i < withCollections.length; i += UPDATE_CHUNK) {
+      const chunk = withCollections.slice(i, i + UPDATE_CHUNK);
+      const results = await Promise.all(
+        chunk.map((rec) =>
+          supabase
+            .from('saves')
+            .update({ ig_collections: rec.ig_collections })
+            .eq('user_id', userId)
+            .eq('instagram_id', rec.instagram_id)
+            .select('id')
+        ),
+      );
+      for (const { data, error } of results) {
+        if (error) {
+          console.error('Collection update error:', error);
+          continue;
+        }
+        if (data?.length) collectionsUpdated += data.length;
+      }
+    }
+
+    const folderNames = new Set();
+    for (const rec of withCollections) {
+      for (const name of rec.ig_collections) folderNames.add(name);
+    }
+
     return NextResponse.json({
       ok: true,
       imported: inserted,
+      collectionsUpdated,
+      foldersFound: folderNames.size,
+      savesWithFolders: withCollections.length,
       total: saves.length,
       message: `Successfully imported ${inserted} saves.`,
     }, { headers: { 'Access-Control-Allow-Origin': '*' } });

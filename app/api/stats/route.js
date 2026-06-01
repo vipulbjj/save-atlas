@@ -42,6 +42,7 @@ export async function GET() {
 
     const categories = {};
     const subCategories = {};
+    const igCollections = {};
     const totalCount = total || 0;
 
     // Hybrid performance scaling
@@ -49,7 +50,7 @@ export async function GET() {
       // 3. Category & Subcategory Counts (In-memory for small/moderate accounts to minimize query roundtrips)
       const { data: catData } = await supabase
         .from('saves')
-        .select('ai_category, ai_subcategory')
+        .select('ai_category, ai_subcategory, ig_collections')
         .eq('user_id', userId);
 
       (catData || []).forEach((item) => {
@@ -59,6 +60,11 @@ export async function GET() {
         const sub = item.ai_subcategory || 'other';
         if (!subCategories[cat]) subCategories[cat] = {};
         subCategories[cat][sub] = (subCategories[cat][sub] || 0) + 1;
+
+        for (const folder of item.ig_collections || []) {
+          if (!folder) continue;
+          igCollections[folder] = (igCollections[folder] || 0) + 1;
+        }
       });
     } else {
       // Index-based Parallel Counts (For large/stress accounts, avoids memory/network/bandwidth bottlenecks completely)
@@ -99,6 +105,18 @@ export async function GET() {
           subCategories[cat][sub] = count;
         }
       });
+
+      const { data: collRows } = await supabase
+        .from('saves')
+        .select('ig_collections')
+        .eq('user_id', userId);
+
+      (collRows || []).forEach((item) => {
+        for (const folder of item.ig_collections || []) {
+          if (!folder) continue;
+          igCollections[folder] = (igCollections[folder] || 0) + 1;
+        }
+      });
     }
 
     return NextResponse.json({
@@ -109,7 +127,8 @@ export async function GET() {
         photos: photos || 0,
         videos: videos || 0,
         categories,
-        subCategories
+        subCategories,
+        igCollections,
       }
     });
   } catch (err) {

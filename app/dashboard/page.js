@@ -5,7 +5,7 @@ import {
   Search, Grid as GridIcon, List, RefreshCw, ChevronDown,
   Layers, ExternalLink, Heart, X, Image, Film,
   ArrowUpRight, Sparkles, Lightbulb, Loader2, UploadCloud,
-  LogOut, Menu, Wand2, CheckCircle2, AlertCircle, Plug, Zap
+  LogOut, Menu, Wand2, CheckCircle2, AlertCircle, Plug, Zap, FolderOpen
 } from "lucide-react";
 import styles from "./dashboard.module.css";
 import { createClient } from "@/lib/supabase-client";
@@ -109,7 +109,8 @@ export default function Dashboard() {
   const [totalSaves, setTotalSaves] = useState(0);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [globalStats, setGlobalStats] = useState({ total: 0, photos: 0, videos: 0, categories: {}, subCategories: {} });
+  const [globalStats, setGlobalStats] = useState({ total: 0, photos: 0, videos: 0, categories: {}, subCategories: {}, igCollections: {} });
+  const [activeIgFolder, setActiveIgFolder] = useState(null);
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -202,7 +203,7 @@ export default function Dashboard() {
     } catch {}
   };
 
-  const fetchSaves = useCallback(async (query, cat, sub, coll, media, reset) => {
+  const fetchSaves = useCallback(async (query, cat, sub, coll, media, igFolder, reset) => {
     const requestId = ++activeRequestRef.current;
     try {
       setLoading(true);
@@ -213,6 +214,7 @@ export default function Dashboard() {
       if (cat !== "all") params.set("category", cat);
       if (sub !== "all") params.set("subcategory", sub);
       if (coll !== "all") params.set("collection", coll);
+      if (igFolder) params.set("ig_collection", igFolder);
       if (media !== "all") params.set("media_type", media);
 
       const res = await fetch(`/api/saves?${params}`);
@@ -256,13 +258,13 @@ export default function Dashboard() {
       return;
     }
     fetchStats();
-    fetchSaves(effectiveSearch, activeCategory, activeSubCategory, activeCollection, mediaFilter, true);
+    fetchSaves(effectiveSearch, activeCategory, activeSubCategory, activeCollection, mediaFilter, activeIgFolder, true);
     setPage(1);
-  }, [effectiveSearch, activeCategory, activeSubCategory, activeCollection, mediaFilter]);
+  }, [effectiveSearch, activeCategory, activeSubCategory, activeCollection, activeIgFolder, mediaFilter]);
 
   useEffect(() => {
     if (page > 1) {
-      fetchSaves(effectiveSearch, activeCategory, activeSubCategory, activeCollection, mediaFilter, false);
+      fetchSaves(effectiveSearch, activeCategory, activeSubCategory, activeCollection, mediaFilter, activeIgFolder, false);
     }
   }, [page]);
 
@@ -311,7 +313,7 @@ export default function Dashboard() {
       setOrganizeState("done");
       // Refresh stats + saves after organize
       await fetchStats();
-      fetchSaves(debouncedSearchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, true);
+      fetchSaves(debouncedSearchQuery, activeCategory, activeSubCategory, activeCollection, mediaFilter, activeIgFolder, true);
       // Reset done state after 4 s
       setTimeout(() => setOrganizeState("idle"), 4000);
     } catch (err) {
@@ -359,6 +361,12 @@ export default function Dashboard() {
   // ─── Derived data ─────────────────────────────────────────────────────────
 
   // Sort non-"all" categories by user count, hide those with 0 saves
+  const igFolders = Object.entries(globalStats.igCollections || {})
+    .filter(([, count]) => count >= 1)
+    .sort((a, b) => b[1] - a[1]);
+
+  const hasIgFolders = igFolders.length > 0;
+
   const visibleCategories = [
     ALL_CAT[0], // "all" always first
     ...ALL_CAT.slice(1).filter((c) => (globalStats.categories[c.id] ?? 0) > 0)
@@ -466,31 +474,92 @@ export default function Dashboard() {
 
           <nav className={styles.nav}>
             <div className={styles.navSection}>
-              <span className={styles.navLabel}>Library</span>
-              {visibleCategories.map((cat) => (
-                <button
-                  key={cat.id}
-                  className={`${styles.navItem} ${activeCategory === cat.id && activeCollection === "all" ? styles.navActive : ""}`}
-                  onClick={() => {
-                    setActiveCategory(cat.id);
-                    setActiveCollection("all");
-                    setActiveSubCategory("all");
-                    setSidebarOpen(false);
-                  }}
-                >
-                  <span className={styles.navIcon}>{cat.icon}</span>
-                  <span>{cat.label}</span>
-                  {cat.id !== "all" && (globalStats.categories[cat.id] ?? 0) > 0 && (
-                    <span className={styles.navBadge}>{globalStats.categories[cat.id]}</span>
-                  )}
-                  {cat.id === "all" && globalStats.total > 0 && (
-                    <span className={styles.navBadge}>{globalStats.total}</span>
-                  )}
-                </button>
-              ))}
+              <span className={styles.navLabel}>{hasIgFolders ? "Your Folders" : "Library"}</span>
+              <button
+                className={`${styles.navItem} ${activeCategory === "all" && activeCollection === "all" && !activeIgFolder ? styles.navActive : ""}`}
+                onClick={() => {
+                  setActiveCategory("all");
+                  setActiveCollection("all");
+                  setActiveSubCategory("all");
+                  setActiveIgFolder(null);
+                  setSidebarOpen(false);
+                }}
+              >
+                <span className={styles.navIcon}><Layers size={15} /></span>
+                <span>All Saves</span>
+                {globalStats.total > 0 && (
+                  <span className={styles.navBadge}>{globalStats.total}</span>
+                )}
+              </button>
+
+              {hasIgFolders ? (
+                igFolders.map(([name, count]) => (
+                  <button
+                    key={name}
+                    className={`${styles.navItem} ${activeIgFolder === name ? styles.navActive : ""}`}
+                    onClick={() => {
+                      setActiveIgFolder(name);
+                      setActiveCategory("all");
+                      setActiveCollection("all");
+                      setActiveSubCategory("all");
+                      setActiveTheme(null);
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    <span className={styles.navIcon}><FolderOpen size={15} /></span>
+                    <span>{name}</span>
+                    <span className={styles.navBadge}>{count}</span>
+                  </button>
+                ))
+              ) : (
+                visibleCategories.filter((c) => c.id !== "all").map((cat) => (
+                  <button
+                    key={cat.id}
+                    className={`${styles.navItem} ${activeCategory === cat.id && activeCollection === "all" && !activeIgFolder ? styles.navActive : ""}`}
+                    onClick={() => {
+                      setActiveCategory(cat.id);
+                      setActiveCollection("all");
+                      setActiveSubCategory("all");
+                      setActiveIgFolder(null);
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    <span className={styles.navIcon}>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    {(globalStats.categories[cat.id] ?? 0) > 0 && (
+                      <span className={styles.navBadge}>{globalStats.categories[cat.id]}</span>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
 
-            {activeCategory !== "all" && sidebarSubcategories.length > 0 && (
+            {hasIgFolders && visibleCategories.filter((c) => c.id !== "all").length > 0 && (
+              <div className={styles.navSection}>
+                <span className={styles.navLabel}>AI Categories</span>
+                {visibleCategories.filter((c) => c.id !== "all").map((cat) => (
+                  <button
+                    key={cat.id}
+                    className={`${styles.navItem} ${activeCategory === cat.id && activeCollection === "all" && !activeIgFolder ? styles.navActive : ""}`}
+                    onClick={() => {
+                      setActiveCategory(cat.id);
+                      setActiveCollection("all");
+                      setActiveSubCategory("all");
+                      setActiveIgFolder(null);
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    <span className={styles.navIcon}>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                    {(globalStats.categories[cat.id] ?? 0) > 0 && (
+                      <span className={styles.navBadge}>{globalStats.categories[cat.id]}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeCategory !== "all" && !activeIgFolder && sidebarSubcategories.length > 0 && (
               <div className={styles.navSection}>
                 <span className={styles.navLabel}>In {activeCategoryLabel}</span>
                 <button
@@ -531,7 +600,7 @@ export default function Dashboard() {
                 <button
                   key={item.id}
                   className={`${styles.navItem} ${activeCollection === item.id ? styles.navActive : ""}`}
-                  onClick={() => { setActiveCollection(item.id); setActiveCategory("all"); setActiveSubCategory("all"); setSidebarOpen(false); }}
+                  onClick={() => { setActiveCollection(item.id); setActiveCategory("all"); setActiveSubCategory("all"); setActiveIgFolder(null); setSidebarOpen(false); }}
                 >
                   <span className={styles.navIcon}>{item.icon}</span>
                   <span>{item.label}</span>
@@ -668,8 +737,9 @@ export default function Dashboard() {
           </div>
 
           {/* Filter pills — subcategories + distinct caption themes */}
-          {activeCategory !== "all" && topics.length > 0 && (
-            <div className={styles.subToolbar}>
+          {activeCategory !== "all" && !activeIgFolder && topics.length > 0 && (
+            <div className={styles.subToolbarWrap}>
+              <div className={styles.subToolbar} role="tablist" aria-label="Category filters">
               <button
                 className={`${styles.subTab} ${!activeTheme && activeSubCategory === "all" ? styles.subTabActive : ""}`}
                 onClick={() => {
@@ -703,6 +773,8 @@ export default function Dashboard() {
                   <span className={styles.subBadge}>{theme.count}</span>
                 </button>
               ))}
+              </div>
+              <span className={styles.subToolbarHint} aria-hidden="true">Scroll →</span>
             </div>
           )}
 
@@ -720,7 +792,7 @@ export default function Dashboard() {
                 <p>Try adjusting your search or clearing your active filters to view your saves.</p>
                 <button
                   className={styles.emptyBtn}
-                  onClick={() => { setSearchQuery(""); setActiveTheme(null); setActiveCategory("all"); setActiveSubCategory("all"); setActiveCollection("all"); setMediaFilter("all"); }}
+                  onClick={() => { setSearchQuery(""); setActiveTheme(null); setActiveCategory("all"); setActiveSubCategory("all"); setActiveCollection("all"); setActiveIgFolder(null); setMediaFilter("all"); }}
                 >
                   Clear All Filters
                 </button>

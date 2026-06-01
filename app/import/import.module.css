@@ -390,6 +390,14 @@
   font-size: 1rem;
 }
 
+.warnText {
+  color: #e8b86d;
+  font-size: 0.95rem;
+  max-width: 420px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
 .successActions {
   display: flex;
   gap: 16px;

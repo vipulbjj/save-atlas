@@ -407,19 +407,58 @@
 }
 
 /* Sub Toolbar */
-.subToolbar {
-  display: flex;
-  gap: 10px;
-  padding: 16px 0;
+.subToolbarWrap {
+  position: relative;
   margin-bottom: 24px;
-  overflow-x: auto;
-  scrollbar-width: none;
   border-bottom: 1px solid var(--border-color);
 }
 
-.subToolbar::-webkit-scrollbar { display: none; }
+.subToolbarWrap::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 22px;
+  width: 56px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--bg-color, #0c0c0c));
+  z-index: 1;
+}
+
+.subToolbarHint {
+  position: absolute;
+  right: 4px;
+  bottom: 6px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.subToolbar {
+  display: flex;
+  gap: 10px;
+  padding: 16px 48px 16px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.subToolbar::-webkit-scrollbar {
+  height: 5px;
+}
+
+.subToolbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
 
 .subTab {
+  flex-shrink: 0;
+  scroll-snap-align: start;
   display: flex;
   align-items: center;
   gap: 8px;

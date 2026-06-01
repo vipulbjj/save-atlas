@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS saves (
   ai_processed    BOOLEAN   DEFAULT FALSE,
   ai_processed_at TIMESTAMPTZ,
 
+  -- Instagram saved-collection folder names (from data export)
+  ig_collections  TEXT[]    DEFAULT '{}',
+
   synced_at       TIMESTAMPTZ DEFAULT now(),
   UNIQUE (instagram_id, user_id)
 );

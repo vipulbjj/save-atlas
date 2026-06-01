@@ -18,6 +18,7 @@ export async function GET(request) {
     const subcategory = searchParams.get('subcategory');
     const mediaType = searchParams.get('media_type');
     const collection = searchParams.get('collection');
+    const igCollection = searchParams.get('ig_collection');
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const offset = (page - 1) * limit;
@@ -37,6 +38,7 @@ export async function GET(request) {
       subcategory,
       mediaType,
       collection,
+      igCollection,
       limit,
       offset,
     });

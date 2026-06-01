@@ -24,6 +24,7 @@ import { POST as updateSave } from '@/app/api/saves/update/route';
 import { parseSearchTerms, captionMatchesSearch, rankSearchResults } from '@/lib/aiSearch';
 import { buildSearchText } from '@/lib/searchText';
 import { buildCategoryFilters } from '@/lib/extractTopics';
+import { parseSavedCollectionsFromExport } from '@/lib/parseInstagramCollections';
 
 // Helper test for Instagram UTF-8 moji-bake encoding correction
 const fixEncoding = (str) => {
@@ -112,6 +113,54 @@ describe('Category filter pills', () => {
     expect(labels).toContain('Interiors');
     expect(labels.some((l) => /Homedecor Homedesign/i.test(l))).toBe(false);
     expect(labels.filter((l) => /interior/i.test(l) && /design/i.test(l)).length).toBeLessThanOrEqual(1);
+  });
+
+  it('rejects pronoun and filler theme pills', () => {
+    const rows = Array.from({ length: 8 }, () => ({
+      caption: 'These are about your style — improve your workflow with them',
+      ai_subcategory: 'other',
+    }));
+    const filters = buildCategoryFilters('tech-ai', {}, rows, 10);
+    const labels = filters.map((f) => f.label.toLowerCase());
+    expect(labels.some((l) => ['these', 'them', 'about', 'your style', 'improve your'].includes(l))).toBe(false);
+  });
+});
+
+describe('Instagram collection parser', () => {
+  it('maps flat export collection names to post shortcodes', () => {
+    const raw = {
+      saved_saved_collections: [
+        { string_map_data: { Name: { value: 'Villa Ideas' } } },
+        { string_map_data: { Name: { href: 'https://www.instagram.com/p/ABC123/', value: 'Post' } } },
+        { string_map_data: { Name: { value: 'Tech Reads' } } },
+        { string_map_data: { Name: { href: 'https://www.instagram.com/reel/XYZ789/', value: 'Reel' } } },
+      ],
+    };
+    const map = parseSavedCollectionsFromExport(raw);
+    expect(map.ABC123).toEqual(['Villa Ideas']);
+    expect(map.XYZ789).toEqual(['Tech Reads']);
+  });
+
+  it('maps grouped string_list_data export format', () => {
+    const raw = {
+      saved_saved_collections: [
+        {
+          title: 'Travel',
+          string_list_data: [
+            { href: 'https://www.instagram.com/p/AbCdEf1/', value: 'user', timestamp: 1 },
+          ],
+        },
+        {
+          title: 'Food',
+          string_list_data: [
+            { href: 'https://www.instagram.com/reel/ReEl234/', value: 'chef', timestamp: 2 },
+          ],
+        },
+      ],
+    };
+    const map = parseSavedCollectionsFromExport(raw);
+    expect(map.AbCdEf1).toEqual(['Travel']);
+    expect(map.ReEl234).toEqual(['Food']);
   });
 });
 
