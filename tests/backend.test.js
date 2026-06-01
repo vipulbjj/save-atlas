@@ -189,6 +189,30 @@ describe('Instagram collection parser', () => {
     const map = parseSavedCollectionsFromExport(raw);
     expect(map.Embed1).toEqual(['Startup Ideas']);
   });
+
+  it('maps title-only collection header followed by flat post rows (motivation-style)', () => {
+    const raw = {
+      saved_saved_collections: [
+        { title: 'motivation', string_list_data: [] },
+        { string_map_data: { Name: { href: 'https://www.instagram.com/p/Mot1234/', value: 'creator' } } },
+        { title: 'Travel', string_list_data: [{ href: 'https://www.instagram.com/reel/Tv5678/' }] },
+      ],
+    };
+    const map = parseSavedCollectionsFromExport(raw);
+    expect(map.Mot1234).toEqual(['motivation']);
+    expect(map.Tv5678).toEqual(['Travel']);
+  });
+
+  it('finds nested saved_saved_collections anywhere in export JSON', () => {
+    const raw = {
+      foo: { bar: { saved_saved_collections: [
+        { string_map_data: { Name: { value: 'Deep Nest' } } },
+        { string_map_data: { Name: { href: 'https://www.instagram.com/p/Nest99/', value: 'x' } } },
+      ] } },
+    };
+    const map = parseSavedCollectionsFromExport(raw);
+    expect(map.Nest99).toEqual(['Deep Nest']);
+  });
 });
 
 describe('Backend API: /api/stats Route Tests', () => {

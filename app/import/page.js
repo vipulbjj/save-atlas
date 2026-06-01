@@ -8,6 +8,9 @@ import {
   mergeCollectionMaps,
   countCollectionEntries,
   isCollectionsJsonPath,
+  isSavedPostsJsonPath,
+  classifyExportJsonPath,
+  folderNamesFromMap,
 } from "@/lib/parseInstagramCollections";
 import { Upload, FileJson, CheckCircle2, AlertCircle, Loader2, ArrowRight, ExternalLink, FolderOpen } from "lucide-react";
 import styles from "./import.module.css";
@@ -37,50 +40,81 @@ const STEPS = [
 // ── Client-side ZIP parser ─────────────────────────────────────────────────
 async function parseCollectionsFromZip(_zip, jsonEntries) {
   let merged = {};
-
-  const collectionFiles = jsonEntries.filter(({ path }) => isCollectionsJsonPath(path));
-  const savedPostsFiles = jsonEntries.filter(({ path }) =>
-    path.toLowerCase().includes("saved_posts"),
-  );
+  const diagnostics = {
+    collectionFiles: [],
+    savedPostsFiles: [],
+    parsedFrom: [],
+  };
 
   async function parseEntry(entry, path, { allowRegexFallback = false } = {}) {
     try {
       const text = await entry.async("string");
+      const before = countCollectionEntries(merged);
       const parsed = JSON.parse(text);
-      const hasCollectionKey =
-        parsed?.saved_saved_collections
-        || parsed?.saved_collections
-        || parsed?.collections;
+      const fromExport = parseSavedCollectionsFromExport(parsed);
+      merged = mergeCollectionMaps(merged, fromExport);
 
-      if (hasCollectionKey || isCollectionsJsonPath(path)) {
-        merged = mergeCollectionMaps(merged, parseSavedCollectionsFromExport(parsed));
+      if (countCollectionEntries(merged) > before) {
+        diagnostics.parsedFrom.push(path);
       }
 
-      if (allowRegexFallback && countCollectionEntries(merged) === 0) {
-        merged = mergeCollectionMaps(merged, parseCollectionsFromText(text));
+      const shouldRegex =
+        allowRegexFallback
+        && (
+          countCollectionEntries(merged) === 0
+          || text.includes("saved_saved_collections")
+          || isCollectionsJsonPath(path)
+        );
+
+      if (shouldRegex) {
+        const fromRegex = parseCollectionsFromText(text);
+        if (countCollectionEntries(fromRegex) > 0) {
+          merged = mergeCollectionMaps(merged, fromRegex);
+          if (!diagnostics.parsedFrom.includes(path)) {
+            diagnostics.parsedFrom.push(`${path} (text)`);
+          }
+        }
       }
     } catch { /* skip */ }
   }
 
-  // 1) Dedicated saved_collections.json (user-named folders live here)
+  const collectionFiles = jsonEntries.filter(({ path }) => isCollectionsJsonPath(path));
+  const savedPostsFiles = jsonEntries.filter(({ path }) => isSavedPostsJsonPath(path));
+  const savedOtherFiles = jsonEntries.filter(({ path }) => {
+    const kind = classifyExportJsonPath(path);
+    return kind === 'saved_other' && !isCollectionsJsonPath(path) && !isSavedPostsJsonPath(path);
+  });
+
+  diagnostics.collectionFiles = collectionFiles.map((f) => f.path);
+  diagnostics.savedPostsFiles = savedPostsFiles.map((f) => f.path);
+
   for (const { path, entry } of collectionFiles) {
     await parseEntry(entry, path, { allowRegexFallback: true });
   }
 
-  // 2) Some exports embed saved_saved_collections inside saved_posts.json
   for (const { path, entry } of savedPostsFiles) {
-    await parseEntry(entry, path);
+    await parseEntry(entry, path, { allowRegexFallback: true });
   }
 
-  // 3) Any other JSON that declares collection keys
+  for (const { path, entry } of savedOtherFiles) {
+    await parseEntry(entry, path, { allowRegexFallback: false });
+  }
+
+  // Last resort: any JSON mentioning saved_saved_collections
   if (countCollectionEntries(merged) === 0) {
     for (const { path, entry } of jsonEntries) {
-      if (isCollectionsJsonPath(path) || path.toLowerCase().includes("saved_posts")) continue;
-      await parseEntry(entry, path);
+      if (diagnostics.parsedFrom.some((p) => p.startsWith(path))) continue;
+      try {
+        const text = await entry.async("string");
+        if (!text.includes("saved_saved_collections") && !text.includes("saved_collections")) continue;
+        await parseEntry(entry, path, { allowRegexFallback: true });
+      } catch { /* skip */ }
     }
   }
 
-  return merged;
+  diagnostics.folderNames = folderNamesFromMap(merged);
+  diagnostics.shortcodesTagged = countCollectionEntries(merged);
+  return { map: merged, diagnostics };
 }
 
 function attachCollections(saves, collectionsByShortcode) {
@@ -89,6 +123,13 @@ function attachCollections(saves, collectionsByShortcode) {
     ...s,
     collections: collectionsByShortcode[s.shortcode] || [],
   }));
+}
+
+function wrapExtractResult(saves, collectionsByShortcode, collectionDiagnostics) {
+  return {
+    saves: attachCollections(saves, collectionsByShortcode),
+    collectionDiagnostics: collectionDiagnostics || null,
+  };
 }
 
 async function extractSavedPosts(file) {
@@ -117,7 +158,8 @@ async function extractSavedPosts(file) {
     // Pass 2: if nothing named saved_posts, try all JSON files
     const filesToTry = savedPostsFiles.length > 0 ? savedPostsFiles : jsonEntries;
 
-    const collectionsByShortcode = await parseCollectionsFromZip(zip, jsonEntries);
+    const { map: collectionsByShortcode, diagnostics: collectionDiagnostics } =
+      await parseCollectionsFromZip(zip, jsonEntries);
 
     const allSaves = [];
     const seenShortcodes = new Set();
@@ -136,7 +178,9 @@ async function extractSavedPosts(file) {
       } catch { /* skip unparseable files */ }
     }
 
-    if (allSaves.length > 0) return attachCollections(allSaves, collectionsByShortcode);
+    if (allSaves.length > 0) {
+      return wrapExtractResult(allSaves, collectionsByShortcode, collectionDiagnostics);
+    }
 
     // Pass 3: brute-force regex across every JSON file in the ZIP
     for (const { entry } of jsonEntries) {
@@ -152,7 +196,9 @@ async function extractSavedPosts(file) {
       } catch { /* skip */ }
     }
 
-    if (allSaves.length > 0) return attachCollections(allSaves, collectionsByShortcode);
+    if (allSaves.length > 0) {
+      return wrapExtractResult(allSaves, collectionsByShortcode, collectionDiagnostics);
+    }
 
     throw new Error(
       "Could not find any saved Instagram posts in this ZIP.\n\nMake sure you requested 'Saved posts' data in JSON format from Instagram. Try re-requesting the export and selecting only 'Saved posts and collections'."
@@ -356,7 +402,9 @@ export default function ImportPage() {
       setStatusLabel(`Reading ${file.name}…`);
       setProgress(15);
 
-      const saves = await extractSavedPosts(file);
+      const extracted = await extractSavedPosts(file);
+      const saves = extracted.saves || extracted;
+      const collectionDiagnostics = extracted.collectionDiagnostics || null;
 
       const savesWithFolders = saves.filter((s) => s.collections?.length).length;
       const folderNames = new Set();
@@ -367,13 +415,18 @@ export default function ImportPage() {
         savesWithFolders,
         foldersFound: folderNames.size,
         folderNames: [...folderNames].sort((a, b) => a.localeCompare(b)),
+        collectionFiles: collectionDiagnostics?.collectionFiles || [],
+        parsedFrom: collectionDiagnostics?.parsedFrom || [],
+        shortcodesTagged: collectionDiagnostics?.shortcodesTagged || 0,
       });
 
       setProgress(35);
       setStatusLabel(
         savesWithFolders > 0
-          ? `Found ${saves.length} posts in ${folderNames.size} Instagram folders. Syncing…`
-          : `Found ${saves.length} saved posts. Sending to your library…`,
+          ? `Found ${saves.length} posts in ${folderNames.size} folders (${[...folderNames].slice(0, 3).join(", ")}${folderNames.size > 3 ? "…" : ""}). Syncing…`
+          : collectionDiagnostics?.collectionFiles?.length
+          ? `Found ${saves.length} posts but no folder names in export files. Syncing posts…`
+          : `Found ${saves.length} saved posts. No saved_collections.json in ZIP — re-export with collections checked.`,
       );
 
       // Step 2 — Send only the small JSON array to the API (not the huge ZIP)
@@ -486,7 +539,17 @@ export default function ImportPage() {
                 </p>
               ) : (
                 <p className={styles.warnText}>
-                  No Instagram collection folders found in this ZIP. When requesting your export, select <strong>Saved posts and collections</strong> (not posts only).
+                  No Instagram collection folders found in this ZIP.
+                  {parseStats?.collectionFiles?.length
+                    ? ` Found ${parseStats.collectionFiles.length} collection file(s) but couldn't read folder names — contact support with your export.`
+                    : " When requesting your export, select Saved posts and collections (both)."}
+                  {parseStats?.parsedFrom?.length ? (
+                    <>
+                      {" "}
+                      Parsed: {parseStats.parsedFrom.slice(0, 2).join(", ")}
+                      {parseStats.parsedFrom.length > 2 ? "…" : ""}.
+                    </>
+                  ) : null}
                 </p>
               )}
               <div className={styles.successActions}>

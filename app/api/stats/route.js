@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { CATEGORIES, SUBCATEGORIES } from '@/lib/categorize';
+import { isValidFolderName } from '@/lib/parseInstagramCollections';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ export async function GET() {
         subCategories[cat][sub] = (subCategories[cat][sub] || 0) + 1;
 
         for (const folder of item.ig_collections || []) {
-          if (!folder) continue;
+          if (!folder || !isValidFolderName(folder)) continue;
           igCollections[folder] = (igCollections[folder] || 0) + 1;
         }
       });
@@ -113,7 +114,7 @@ export async function GET() {
 
       (collRows || []).forEach((item) => {
         for (const folder of item.ig_collections || []) {
-          if (!folder) continue;
+          if (!folder || !isValidFolderName(folder)) continue;
           igCollections[folder] = (igCollections[folder] || 0) + 1;
         }
       });

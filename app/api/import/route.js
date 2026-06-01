@@ -199,6 +199,7 @@ export async function POST(request) {
       imported: inserted,
       collectionsUpdated,
       foldersFound: folderNames.size,
+      folderNames: [...folderNames].sort((a, b) => a.localeCompare(b)),
       savesWithFolders: withCollections.length,
       total: saves.length,
       message: `Successfully imported ${inserted} saves.`,
